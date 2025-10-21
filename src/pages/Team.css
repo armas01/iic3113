@@ -1,0 +1,190 @@
+.team {
+    min-height: 100vh;
+    background: #f8f9fa;
+}
+
+.team-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 3rem 2rem;
+    text-align: center;
+}
+
+.team-header h1 {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    font-weight: 800;
+}
+
+.team-header p {
+    font-size: 1.3rem;
+    opacity: 0.95;
+}
+
+.team-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 3rem 2rem;
+}
+
+.team-intro {
+    background: white;
+    padding: 2.5rem;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    margin-bottom: 3rem;
+    text-align: center;
+}
+
+.team-intro h2 {
+    font-size: 2rem;
+    color: #2d3748;
+    margin-bottom: 1.5rem;
+}
+
+.team-intro p {
+    color: #4a5568;
+    line-height: 1.8;
+    font-size: 1.1rem;
+    margin-bottom: 1rem;
+}
+
+.team-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+    margin-bottom: 3rem;
+}
+
+.team-card {
+    background: white;
+    padding: 2rem;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    text-align: center;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.team-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 12px rgba(0, 0, 0, 0.15);
+}
+
+.team-avatar {
+    font-size: 5rem;
+    margin-bottom: 1rem;
+}
+
+.team-card h3 {
+    font-size: 1.5rem;
+    color: #2d3748;
+    margin-bottom: 0.5rem;
+}
+
+.team-role {
+    color: #667eea;
+    font-weight: 600;
+    font-size: 1.1rem;
+    margin-bottom: 1rem;
+}
+
+.team-card p {
+    color: #4a5568;
+    line-height: 1.6;
+}
+
+.team-values {
+    margin-bottom: 3rem;
+}
+
+.team-values h2 {
+    text-align: center;
+    font-size: 2rem;
+    color: #2d3748;
+    margin-bottom: 2rem;
+}
+
+.values-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 2rem;
+}
+
+.value-card {
+    background: white;
+    padding: 2rem;
+    border-radius: 12px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    text-align: center;
+}
+
+.value-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+}
+
+.value-card h3 {
+    font-size: 1.3rem;
+    color: #667eea;
+    margin-bottom: 0.75rem;
+}
+
+.value-card p {
+    color: #4a5568;
+    line-height: 1.6;
+}
+
+.team-contact {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 3rem;
+    border-radius: 12px;
+    text-align: center;
+}
+
+.team-contact h2 {
+    font-size: 2rem;
+    margin-bottom: 1rem;
+}
+
+.team-contact p {
+    font-size: 1.1rem;
+    margin-bottom: 2rem;
+    opacity: 0.95;
+    line-height: 1.6;
+}
+
+.contact-button {
+    background: white;
+    color: #667eea;
+    border: none;
+    padding: 1rem 2.5rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.contact-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+@media (max-width: 768px) {
+    .team-header h1 {
+        font-size: 2rem;
+    }
+
+    .team-header p {
+        font-size: 1.1rem;
+    }
+
+    .team-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .values-grid {
+        grid-template-columns: 1fr;
+    }
+}
