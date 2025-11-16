@@ -10,6 +10,72 @@ function Dashboard() {
         comuna: 'all'
     })
 
+    const [scraperConfig, setScraperConfig] = useState({
+        operation: 'venta',
+        propertyType: 'departamento',
+        comuna: 'las-condes',
+        pages: 3
+    })
+
+    const [scraping, setScraping] = useState(false)
+    const [scrapeMessage, setScrapeMessage] = useState('')
+
+    const handleScrape = async () => {
+        setScraping(true)
+        setScrapeMessage('Iniciando scraping...')
+        
+        try {
+            const response = await fetch('http://localhost:3001/api/scrape', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(scraperConfig)
+            })
+            
+            const data = await response.json()
+            
+            if (data.success) {
+                setScrapeMessage(`✅ Scraping iniciado! Los datos se actualizarán en breve. Ve a "Raw Data" o "Análisis IA" para ver los resultados.`)
+            } else {
+                setScrapeMessage(`❌ Error: ${data.error}`)
+            }
+        } catch (error) {
+            setScrapeMessage(`❌ Error: No se pudo conectar con el servidor. Asegúrate de ejecutar "yarn server" en otra terminal.`)
+            console.error('Scrape error:', error)
+        } finally {
+            setTimeout(() => {
+                setScraping(false)
+                setScrapeMessage('')
+            }, 5000)
+        }
+    }
+
+    const handleUseMockData = async () => {
+        setScraping(true)
+        setScrapeMessage('Generando datos de prueba...')
+        
+        try {
+            const mockData = await import('../../../server/scraper.js')
+            const properties = mockData.generateMockProperties({
+                operation: scraperConfig.operation,
+                propertyType: scraperConfig.propertyType,
+                comuna: scraperConfig.comuna,
+                count: scraperConfig.pages * 20
+            })
+            
+            setScrapeMessage(`✅ Se generaron ${properties.length} propiedades de prueba. Ve a "Raw Data" para verlas.`)
+        } catch (error) {
+            setScrapeMessage('❌ Error generando datos de prueba')
+            console.error('Mock data error:', error)
+        } finally {
+            setTimeout(() => {
+                setScraping(false)
+                setScrapeMessage('')
+            }, 5000)
+        }
+    }
+
     // Datos hardcodeados simulando scraping de Portal Inmobiliario
     const properties = [
         {
@@ -494,6 +560,107 @@ function Dashboard() {
             </div>
 
             <div className="dashboard-content">
+                {/* Web Scraper Section */}
+                <div className="scraper-section">
+                    <div className="scraper-header">
+                        <h2>🕷️ Web Scraper</h2>
+                        <span className="scraper-status">
+                            {scraping ? '⏳ Ejecutando...' : '✅ Listo'}
+                        </span>
+                    </div>
+
+                    <div className="scraper-controls">
+                        <div>
+                            <select
+                                value={scraperConfig.operation}
+                                onChange={(e) => setScraperConfig({ ...scraperConfig, operation: e.target.value })}
+                                disabled={scraping}
+                            >
+                                <option value="venta">Venta</option>
+                                <option value="arriendo">Arriendo</option>
+                            </select>
+                        </div>
+                        <div>
+                            <select
+                                value={scraperConfig.propertyType}
+                                onChange={(e) => setScraperConfig({ ...scraperConfig, propertyType: e.target.value })}
+                                disabled={scraping}
+                            >
+                                <option value="departamento">Departamento</option>
+                                <option value="casa">Casa</option>
+                                <option value="oficina">Oficina</option>
+                                <option value="bodega">Bodega</option>
+                                <option value="estacionamiento">Estacionamiento</option>
+                            </select>
+                        </div>
+                        <div>
+                            <select
+                                value={scraperConfig.comuna}
+                                onChange={(e) => setScraperConfig({ ...scraperConfig, comuna: e.target.value })}
+                                disabled={scraping}
+                            >
+                                <option value="las-condes">Las Condes</option>
+                                <option value="providencia">Providencia</option>
+                                <option value="vitacura">Vitacura</option>
+                                <option value="santiago">Santiago</option>
+                                <option value="nunoa">Ñuñoa</option>
+                                <option value="la-reina">La Reina</option>
+                                <option value="quilicura">Quilicura</option>
+                            </select>
+                        </div>
+                        <div>
+                            <input
+                                type="number"
+                                min="1"
+                                max="10"
+                                value={scraperConfig.pages}
+                                onChange={(e) => setScraperConfig({ ...scraperConfig, pages: Number(e.target.value) })}
+                                placeholder="Páginas"
+                                disabled={scraping}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="scraper-actions">
+                        <button 
+                            className="scraper-button primary" 
+                            onClick={handleScrape}
+                            disabled={scraping}
+                        >
+                            <span>🚀</span> Ejecutar Scraping Real
+                        </button>
+                        <button 
+                            className="scraper-button secondary" 
+                            onClick={handleUseMockData}
+                            disabled={scraping}
+                        >
+                            <span>🎲</span> Usar Datos de Prueba
+                        </button>
+                    </div>
+
+                    {scrapeMessage && (
+                        <div className="scraper-info">
+                            <p>{scrapeMessage}</p>
+                        </div>
+                    )}
+
+                    <div className="scraper-info">
+                        <p>
+                            <strong>📌 Cómo usar:</strong>
+                        </p>
+                        <p>
+                            1️⃣ Configura los parámetros de búsqueda arriba<br />
+                            2️⃣ Haz clic en "Ejecutar Scraping Real" para extraer datos reales de Portal Inmobiliario<br />
+                            3️⃣ O usa "Datos de Prueba" para generar datos simulados (más rápido)<br />
+                            4️⃣ Ve a "Raw Data" para ver los datos sin procesar<br />
+                            5️⃣ Ve a "Análisis IA" para ver análisis avanzados y oportunidades
+                        </p>
+                        <p>
+                            <strong>⚠️ Nota:</strong> Para que funcione el scraping real, debes tener el servidor backend corriendo: <code>yarn server</code>
+                        </p>
+                    </div>
+                </div>
+
                 {/* Stats Cards */}
                 <div className="stats-grid">
                     <div className="stat-box">

@@ -22,7 +22,23 @@ function Navbar({ currentPage, setCurrentPage }) {
                             className={currentPage === 'dashboard' ? 'active' : ''}
                             onClick={() => setCurrentPage('dashboard')}
                         >
-                            Analizar Propiedades
+                            Dashboard
+                        </button>
+                    </li>
+                    <li>
+                        <button
+                            className={currentPage === 'analysis' ? 'active' : ''}
+                            onClick={() => setCurrentPage('analysis')}
+                        >
+                            Análisis IA
+                        </button>
+                    </li>
+                    <li>
+                        <button
+                            className={currentPage === 'rawdata' ? 'active' : ''}
+                            onClick={() => setCurrentPage('rawdata')}
+                        >
+                            Raw Data
                         </button>
                     </li>
                     <li>
@@ -30,7 +46,7 @@ function Navbar({ currentPage, setCurrentPage }) {
                             className={currentPage === 'guide' ? 'active' : ''}
                             onClick={() => setCurrentPage('guide')}
                         >
-                            Guía de Uso
+                            Guía
                         </button>
                     </li>
                     <li>
