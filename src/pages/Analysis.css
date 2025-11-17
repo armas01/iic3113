@@ -4,6 +4,47 @@
     margin: 0 auto;
 }
 
+.under-development {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 60vh;
+    text-align: center;
+    padding: 3rem;
+}
+
+.development-icon {
+    font-size: 6rem;
+    margin-bottom: 1.5rem;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.7;
+        transform: scale(1.05);
+    }
+}
+
+.under-development h2 {
+    font-size: 2.5rem;
+    color: #1a1a2e;
+    margin-bottom: 1rem;
+    font-weight: 700;
+}
+
+.under-development p {
+    font-size: 1.2rem;
+    color: #666;
+    max-width: 500px;
+    line-height: 1.6;
+}
+
 .analysis-header {
     display: flex;
     justify-content: space-between;
@@ -179,6 +220,10 @@
     border-radius: 10px;
 }
 
+.analysis-card.wide {
+    grid-column: 1 / -1;
+}
+
 .analysis-card h3 {
     margin-bottom: 1.5rem;
     color: #1a1a2e;
@@ -323,6 +368,293 @@
 .rank-count {
     color: #999;
     font-size: 0.85rem;
+}
+
+/* Neighborhoods Section */
+.neighborhoods-section {
+    margin-bottom: 2rem;
+}
+
+.neighborhoods-section h3 {
+    color: #1a1a2e;
+    margin-bottom: 0.8rem;
+}
+
+.neighborhoods-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+}
+
+.neighborhood-card {
+    background: linear-gradient(135deg, #f5f7fa 0%, #e3e9f1 100%);
+    padding: 1.5rem;
+    border-radius: 10px;
+    position: relative;
+    transition: all 0.2s;
+}
+
+.neighborhood-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+}
+
+.neighborhood-rank {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    background: #667eea;
+    color: white;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 0.9rem;
+}
+
+.neighborhood-card h4 {
+    color: #1a1a2e;
+    font-size: 1.15rem;
+    margin-bottom: 0.3rem;
+}
+
+.neighborhood-comuna {
+    color: #667eea;
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+    font-weight: 500;
+}
+
+.neighborhood-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.stat-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem;
+    background: white;
+    border-radius: 6px;
+}
+
+.stat-row span {
+    color: #666;
+    font-size: 0.85rem;
+}
+
+.stat-row strong {
+    color: #1a1a2e;
+    font-size: 0.9rem;
+}
+
+.stat-row.highlight strong {
+    color: #667eea;
+    font-weight: 700;
+}
+
+/* Amenities Analysis */
+.amenities-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.amenity-impact-card {
+    background: #f5f7fa;
+    padding: 1.5rem;
+    border-radius: 10px;
+}
+
+.amenity-impact-card h3 {
+    margin-bottom: 1.5rem;
+    color: #1a1a2e;
+}
+
+.impact-comparison {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.impact-side {
+    flex: 1;
+    background: white;
+    padding: 1.5rem;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.impact-label {
+    color: #666;
+    font-size: 0.9rem;
+    margin-bottom: 0.8rem;
+    text-transform: uppercase;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+.impact-count {
+    color: #1a1a2e;
+    font-size: 1rem;
+    margin-bottom: 0.8rem;
+    font-weight: 500;
+}
+
+.impact-price {
+    color: #667eea;
+    font-size: 1.8rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+}
+
+.impact-detail {
+    color: #666;
+    font-size: 0.85rem;
+}
+
+.impact-divider {
+    color: #667eea;
+    font-weight: bold;
+    font-size: 1.2rem;
+}
+
+/* Features Analysis */
+.features-analysis {
+    margin-top: 2rem;
+}
+
+.features-analysis h3 {
+    color: #1a1a2e;
+    margin-bottom: 1.5rem;
+}
+
+.features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 1rem;
+}
+
+.feature-card {
+    background: linear-gradient(135deg, #f5f7fa 0%, #e8eef5 100%);
+    padding: 1.2rem;
+    border-radius: 10px;
+    text-align: center;
+    transition: all 0.2s;
+}
+
+.feature-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 6px 12px rgba(102, 126, 234, 0.15);
+}
+
+.feature-icon {
+    font-size: 2.5rem;
+    margin-bottom: 0.8rem;
+}
+
+.feature-name {
+    color: #1a1a2e;
+    font-weight: 600;
+    margin-bottom: 0.8rem;
+    text-transform: capitalize;
+}
+
+.feature-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.feature-count {
+    color: #667eea;
+    font-size: 0.95rem;
+    font-weight: 600;
+}
+
+.feature-percentage {
+    color: #999;
+    font-size: 0.8rem;
+}
+
+.feature-price {
+    color: #666;
+    font-size: 0.8rem;
+    margin-top: 0.3rem;
+}
+
+/* Combinations Analysis */
+.combinations-analysis {
+    margin-top: 2rem;
+}
+
+.combinations-analysis h3 {
+    color: #1a1a2e;
+    margin-bottom: 0.8rem;
+}
+
+.combinations-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+}
+
+.combo-card {
+    background: #f5f7fa;
+    padding: 1.5rem;
+    border-radius: 10px;
+    border: 2px solid transparent;
+    transition: all 0.2s;
+}
+
+.combo-card:hover {
+    border-color: #667eea;
+    transform: translateY(-4px);
+}
+
+.combo-name {
+    color: #667eea;
+    font-size: 1.8rem;
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 1rem;
+}
+
+.combo-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+}
+
+.combo-stat {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.6rem;
+    background: white;
+    border-radius: 6px;
+}
+
+.combo-stat span {
+    color: #666;
+    font-size: 0.85rem;
+}
+
+.combo-stat strong {
+    color: #1a1a2e;
+    font-size: 0.9rem;
+}
+
+.combo-stat.highlight strong {
+    color: #667eea;
+    font-weight: 700;
+    font-size: 1rem;
 }
 
 /* Opportunities Section */
@@ -683,5 +1015,69 @@
     .ai-metrics {
         grid-template-columns: 1fr;
     }
+    
+    .neighborhoods-grid,
+    .features-grid,
+    .combinations-grid,
+    .amenities-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .impact-comparison {
+        flex-direction: column;
+    }
 }
+
+/* Loading and Error States */
+.loading-container,
+.error-container,
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 400px;
+    text-align: center;
+}
+
+.spinner {
+    width: 50px;
+    height: 50px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #667eea;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 1rem;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.error-icon,
+.empty-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+}
+
+.retry-button,
+.refresh-button {
+    background: #667eea;
+    color: white;
+    border: none;
+    padding: 0.8rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.retry-button:hover,
+.refresh-button:hover {
+    background: #5568d3;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
 

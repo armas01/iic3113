@@ -16,19 +16,38 @@ export function analyzeData(properties) {
 
     console.log(`📊 Analyzing ${properties.length} properties...`);
 
+    // Filter out properties over 40,000 UF
+    const filteredProperties = properties.filter(p => {
+        const priceUF = p.priceUF || 0;
+        return priceUF <= 40000;
+    });
+
+    const excludedCount = properties.length - filteredProperties.length;
+    if (excludedCount > 0) {
+        console.log(`🔍 Filtered out ${excludedCount} properties over 40,000 UF`);
+    }
+
+    console.log(`📊 Analyzing ${filteredProperties.length} properties (after filtering)...`);
+
     const analysis = {
-        summary: getSummaryStats(properties),
-        priceAnalysis: analyzePrices(properties),
-        locationAnalysis: analyzeByLocation(properties),
-        typeAnalysis: analyzeByType(properties),
-        sizeAnalysis: analyzeSize(properties),
-        amenitiesAnalysis: analyzeAmenities(properties),
-        timeAnalysis: analyzeByTime(properties),
-        marketInsights: generateMarketInsights(properties),
-        correlations: analyzeCorrelations(properties),
-        opportunities: findOpportunities(properties),
-        trends: analyzeTrends(properties),
-        aiReadyData: prepareDataForAI(properties)
+        summary: getSummaryStats(filteredProperties),
+        priceAnalysis: analyzePrices(filteredProperties),
+        locationAnalysis: analyzeByLocation(filteredProperties),
+        typeAnalysis: analyzeByType(filteredProperties),
+        sizeAnalysis: analyzeSize(filteredProperties),
+        amenitiesAnalysis: analyzeAmenities(filteredProperties),
+        timeAnalysis: analyzeByTime(filteredProperties),
+        marketInsights: generateMarketInsights(filteredProperties),
+        correlations: analyzeCorrelations(filteredProperties),
+        opportunities: findOpportunities(filteredProperties),
+        trends: analyzeTrends(filteredProperties),
+        aiReadyData: prepareDataForAI(filteredProperties),
+        filterInfo: {
+            totalScraped: properties.length,
+            totalAnalyzed: filteredProperties.length,
+            excluded: excludedCount,
+            maxPriceUF: 40000
+        }
     };
 
     console.log('✅ Analysis completed');
@@ -57,22 +76,38 @@ function getSummaryStats(properties) {
 }
 
 /**
- * Analyze prices
+ * Analyze prices - now with UF-based distribution
  */
 function analyzePrices(properties) {
     const withPrice = properties.filter(p => p.price && p.price > 0);
     const withPriceAndArea = properties.filter(p => p.price > 0 && p.area > 0);
+    const withPriceUF = properties.filter(p => p.priceUF && p.priceUF > 0);
 
     const pricesPerSqMeter = withPriceAndArea.map(p => p.price / p.area);
 
+    // UF-based distribution (2000 UF intervals)
+    const ufDistribution = {
+        '0-2000': withPriceUF.filter(p => p.priceUF > 0 && p.priceUF <= 2000).length,
+        '2000-4000': withPriceUF.filter(p => p.priceUF > 2000 && p.priceUF <= 4000).length,
+        '4000-6000': withPriceUF.filter(p => p.priceUF > 4000 && p.priceUF <= 6000).length,
+        '6000-8000': withPriceUF.filter(p => p.priceUF > 6000 && p.priceUF <= 8000).length,
+        '8000-10000': withPriceUF.filter(p => p.priceUF > 8000 && p.priceUF <= 10000).length,
+        '10000-12000': withPriceUF.filter(p => p.priceUF > 10000 && p.priceUF <= 12000).length,
+        '12000-14000': withPriceUF.filter(p => p.priceUF > 12000 && p.priceUF <= 14000).length,
+        '14000-16000': withPriceUF.filter(p => p.priceUF > 14000 && p.priceUF <= 16000).length,
+        '16000-18000': withPriceUF.filter(p => p.priceUF > 16000 && p.priceUF <= 18000).length,
+        '18000-20000': withPriceUF.filter(p => p.priceUF > 18000 && p.priceUF <= 20000).length,
+        '20000+': withPriceUF.filter(p => p.priceUF > 20000).length
+    };
+
     return {
-        distribution: {
-            below1M: withPrice.filter(p => p.price < 1000000).length,
-            '1M-5M': withPrice.filter(p => p.price >= 1000000 && p.price < 5000000).length,
-            '5M-10M': withPrice.filter(p => p.price >= 5000000 && p.price < 10000000).length,
-            '10M-50M': withPrice.filter(p => p.price >= 10000000 && p.price < 50000000).length,
-            '50M-100M': withPrice.filter(p => p.price >= 50000000 && p.price < 100000000).length,
-            above100M: withPrice.filter(p => p.price >= 100000000).length
+        distribution: ufDistribution,
+        ufStats: {
+            average: avg(withPriceUF.map(p => p.priceUF)),
+            median: median(withPriceUF.map(p => p.priceUF)),
+            min: Math.min(...withPriceUF.map(p => p.priceUF)),
+            max: Math.max(...withPriceUF.map(p => p.priceUF)),
+            stdDev: stdDev(withPriceUF.map(p => p.priceUF))
         },
         pricePerSqMeter: {
             average: avg(pricesPerSqMeter),
@@ -81,13 +116,19 @@ function analyzePrices(properties) {
             max: Math.max(...pricesPerSqMeter),
             stdDev: stdDev(pricesPerSqMeter)
         },
+        pricePerSqMeterUF: withPriceAndArea.length > 0 ? {
+            average: avg(withPriceAndArea.map(p => p.priceUF / p.area)),
+            median: median(withPriceAndArea.map(p => p.priceUF / p.area)),
+            min: Math.min(...withPriceAndArea.map(p => p.priceUF / p.area)),
+            max: Math.max(...withPriceAndArea.map(p => p.priceUF / p.area))
+        } : null,
         quartiles: calculateQuartiles(withPrice.map(p => p.price)),
         outliers: detectOutliers(withPrice.map(p => p.price))
     };
 }
 
 /**
- * Analyze by location (comuna)
+ * Analyze by location (comuna and neighborhoods)
  */
 function analyzeByLocation(properties) {
     const byComuna = groupBy(properties, 'comuna');
@@ -96,24 +137,81 @@ function analyzeByLocation(properties) {
     for (const [comuna, props] of Object.entries(byComuna)) {
         const withPrice = props.filter(p => p.price > 0);
         const withArea = props.filter(p => p.area > 0);
+        const withPriceUF = props.filter(p => p.priceUF > 0);
+
+        // analyze neighborhoods within comuna
+        const neighborhoods = {};
+        props.forEach(p => {
+            if (p.neighborhood) {
+                if (!neighborhoods[p.neighborhood]) {
+                    neighborhoods[p.neighborhood] = [];
+                }
+                neighborhoods[p.neighborhood].push(p);
+            }
+        });
+
+        const neighborhoodStats = {};
+        for (const [neighborhood, nProps] of Object.entries(neighborhoods)) {
+            const nWithPrice = nProps.filter(p => p.priceUF > 0);
+            const nWithArea = nProps.filter(p => p.area > 0);
+            
+            neighborhoodStats[neighborhood] = {
+                count: nProps.length,
+                avgPriceUF: avg(nWithPrice.map(p => p.priceUF)),
+                avgArea: avg(nWithArea.map(p => p.area)),
+                avgPricePerSqMeterUF: nWithPrice.length > 0 && nWithArea.length > 0
+                    ? avg(nProps.filter(p => p.priceUF > 0 && p.area > 0).map(p => p.priceUF / p.area))
+                    : null
+            };
+        }
 
         comunaStats[comuna] = {
             count: props.length,
             averagePrice: avg(withPrice.map(p => p.price)),
+            averagePriceUF: avg(withPriceUF.map(p => p.priceUF)),
             medianPrice: median(withPrice.map(p => p.price)),
+            medianPriceUF: median(withPriceUF.map(p => p.priceUF)),
             averageArea: avg(withArea.map(p => p.area)),
             averagePricePerSqMeter: withPrice.length > 0 && withArea.length > 0 
                 ? avg(props.filter(p => p.price > 0 && p.area > 0).map(p => p.price / p.area))
                 : null,
+            averagePricePerSqMeterUF: withPriceUF.length > 0 && withArea.length > 0
+                ? avg(props.filter(p => p.priceUF > 0 && p.area > 0).map(p => p.priceUF / p.area))
+                : null,
             newListings: props.filter(p => p.isNew).length,
-            propertyTypes: countByKey(props, 'propertyType')
+            propertyTypes: countByKey(props, 'propertyType'),
+            neighborhoods: neighborhoodStats,
+            // price distribution within comuna
+            priceRangeUF: {
+                '0-5000': withPriceUF.filter(p => p.priceUF <= 5000).length,
+                '5000-10000': withPriceUF.filter(p => p.priceUF > 5000 && p.priceUF <= 10000).length,
+                '10000-15000': withPriceUF.filter(p => p.priceUF > 10000 && p.priceUF <= 15000).length,
+                '15000+': withPriceUF.filter(p => p.priceUF > 15000).length
+            }
         };
     }
 
-    // Rank by various metrics
+    // rank neighborhoods across all comunas
+    const allNeighborhoods = [];
+    for (const [comuna, stats] of Object.entries(comunaStats)) {
+        for (const [neighborhood, nStats] of Object.entries(stats.neighborhoods)) {
+            allNeighborhoods.push({
+                neighborhood,
+                comuna,
+                ...nStats
+            });
+        }
+    }
+
+    const topNeighborhoods = allNeighborhoods
+        .filter(n => n.avgPricePerSqMeterUF)
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 10);
+
+    // rank by various metrics
     const ranking = {
         mostExpensive: Object.entries(comunaStats)
-            .sort((a, b) => (b[1].averagePrice || 0) - (a[1].averagePrice || 0))
+            .sort((a, b) => (b[1].averagePriceUF || 0) - (a[1].averagePriceUF || 0))
             .slice(0, 5)
             .map(([comuna, stats]) => ({ comuna, ...stats })),
         mostListings: Object.entries(comunaStats)
@@ -121,13 +219,18 @@ function analyzeByLocation(properties) {
             .slice(0, 5)
             .map(([comuna, stats]) => ({ comuna, ...stats })),
         bestValue: Object.entries(comunaStats)
-            .filter(([_, stats]) => stats.averagePricePerSqMeter)
-            .sort((a, b) => (a[1].averagePricePerSqMeter || Infinity) - (b[1].averagePricePerSqMeter || Infinity))
+            .filter(([_, stats]) => stats.averagePricePerSqMeterUF)
+            .sort((a, b) => (a[1].averagePricePerSqMeterUF || Infinity) - (b[1].averagePricePerSqMeterUF || Infinity))
             .slice(0, 5)
             .map(([comuna, stats]) => ({ comuna, ...stats }))
     };
 
-    return { byComuna: comunaStats, ranking };
+    return { 
+        byComuna: comunaStats, 
+        ranking,
+        topNeighborhoods,
+        totalNeighborhoods: allNeighborhoods.length
+    };
 }
 
 /**
@@ -179,19 +282,114 @@ function analyzeSize(properties) {
 }
 
 /**
- * Analyze amenities (bedrooms, bathrooms, parking)
+ * Analyze amenities (bedrooms, bathrooms, parking, bodegas, features)
  */
 function analyzeAmenities(properties) {
+    const withParking = properties.filter(p => p.parking && p.parking > 0);
+    const withBodegas = properties.filter(p => p.bodegas && p.bodegas > 0);
+    
+    // analyze parking impact on price
+    const parkingImpact = withParking.length > 0 ? {
+        withParking: {
+            count: withParking.length,
+            avgPriceUF: avg(withParking.filter(p => p.priceUF > 0).map(p => p.priceUF)),
+            avgParkingSpaces: avg(withParking.map(p => p.parking))
+        },
+        withoutParking: {
+            count: properties.filter(p => !p.parking || p.parking === 0).length,
+            avgPriceUF: avg(properties.filter(p => (!p.parking || p.parking === 0) && p.priceUF > 0).map(p => p.priceUF))
+        }
+    } : null;
+
+    // analyze bodegas impact
+    const bodegasImpact = withBodegas.length > 0 ? {
+        withBodegas: {
+            count: withBodegas.length,
+            avgPriceUF: avg(withBodegas.filter(p => p.priceUF > 0).map(p => p.priceUF)),
+            avgBodegas: avg(withBodegas.map(p => p.bodegas))
+        },
+        withoutBodegas: {
+            count: properties.filter(p => !p.bodegas || p.bodegas === 0).length,
+            avgPriceUF: avg(properties.filter(p => (!p.bodegas || p.bodegas === 0) && p.priceUF > 0).map(p => p.priceUF))
+        }
+    } : null;
+
+    // analyze property features/amenities
+    const featureAnalysis = {};
+    if (properties.some(p => p.amenities)) {
+        const features = ['gimnasio', 'piscina', 'terraza', 'seguridad', 'amoblado', 'logia', 'vista', 'luminoso'];
+        
+        features.forEach(feature => {
+            const withFeature = properties.filter(p => p.amenities && p.amenities[feature]);
+            const withFeatureAndPrice = withFeature.filter(p => p.priceUF > 0);
+            
+            if (withFeature.length > 0) {
+                featureAnalysis[feature] = {
+                    count: withFeature.length,
+                    percentage: ((withFeature.length / properties.length) * 100).toFixed(1),
+                    avgPriceUF: withFeatureAndPrice.length > 0 ? avg(withFeatureAndPrice.map(p => p.priceUF)) : null
+                };
+            }
+        });
+    }
+
     return {
         bedrooms: countByKey(properties.filter(p => p.bedrooms), 'bedrooms'),
         bathrooms: countByKey(properties.filter(p => p.bathrooms), 'bathrooms'),
         parking: countByKey(properties.filter(p => p.parking), 'parking'),
+        bodegas: countByKey(properties.filter(p => p.bodegas), 'bodegas'),
         averages: {
             bedrooms: avg(properties.filter(p => p.bedrooms).map(p => p.bedrooms)),
             bathrooms: avg(properties.filter(p => p.bathrooms).map(p => p.bathrooms)),
-            parking: avg(properties.filter(p => p.parking).map(p => p.parking))
-        }
+            parking: avg(properties.filter(p => p.parking).map(p => p.parking)),
+            bodegas: avg(properties.filter(p => p.bodegas).map(p => p.bodegas))
+        },
+        parkingImpact,
+        bodegasImpact,
+        features: featureAnalysis,
+        // most valuable combination
+        valuableCombinations: analyzeValueCombinations(properties)
     };
+}
+
+/**
+ * Analyze which combinations of features provide best value
+ */
+function analyzeValueCombinations(properties) {
+    const combos = [];
+    
+    // bedrooms + bathrooms combinations
+    properties.forEach(p => {
+        if (p.bedrooms && p.bathrooms && p.priceUF > 0 && p.area > 0) {
+            const combo = `${p.bedrooms}D/${p.bathrooms}B`;
+            const existing = combos.find(c => c.combo === combo);
+            
+            if (existing) {
+                existing.prices.push(p.priceUF);
+                existing.areas.push(p.area);
+                existing.count++;
+            } else {
+                combos.push({
+                    combo,
+                    prices: [p.priceUF],
+                    areas: [p.area],
+                    count: 1
+                });
+            }
+        }
+    });
+    
+    return combos
+        .filter(c => c.count >= 3) // at least 3 properties
+        .map(c => ({
+            combo: c.combo,
+            count: c.count,
+            avgPriceUF: avg(c.prices),
+            avgArea: avg(c.areas),
+            avgPricePerSqMeterUF: avg(c.prices) / avg(c.areas)
+        }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 10);
 }
 
 /**
@@ -300,20 +498,21 @@ function analyzeCorrelations(properties) {
  * Find investment opportunities
  */
 function findOpportunities(properties) {
-    const withPriceAndArea = properties.filter(p => p.price > 0 && p.area > 0);
+    // Use priceUF for calculations
+    const withPriceAndArea = properties.filter(p => p.priceUF > 0 && p.area > 0);
     
     if (withPriceAndArea.length === 0) return [];
 
-    const avgPricePerSqM = avg(withPriceAndArea.map(p => p.price / p.area));
-    const stdDevPricePerSqM = stdDev(withPriceAndArea.map(p => p.price / p.area));
+    const avgPricePerSqM = avg(withPriceAndArea.map(p => p.priceUF / p.area));
+    const stdDevPricePerSqM = stdDev(withPriceAndArea.map(p => p.priceUF / p.area));
 
     // Find properties below average price per sq meter
     const opportunities = withPriceAndArea
         .map(p => ({
             ...p,
-            pricePerSqM: p.price / p.area,
-            savingsPerSqM: avgPricePerSqM - (p.price / p.area),
-            score: (avgPricePerSqM - (p.price / p.area)) / stdDevPricePerSqM
+            pricePerSqM: p.priceUF / p.area,
+            savingsPerSqM: avgPricePerSqM - (p.priceUF / p.area),
+            score: (avgPricePerSqM - (p.priceUF / p.area)) / stdDevPricePerSqM
         }))
         .filter(p => p.savingsPerSqM > 0)
         .sort((a, b) => b.score - a.score)
@@ -324,8 +523,16 @@ function findOpportunities(properties) {
             id: o.id,
             title: o.title,
             comuna: o.comuna,
-            price: o.price,
-            area: o.area
+            price: o.priceUF, // Use priceUF instead of price
+            area: o.area,
+            bedrooms: o.bedrooms || 0,
+            bathrooms: o.bathrooms || 0,
+            parking: o.parking || o.parkings || 0,
+            bodegas: o.bodegas || 0,
+            amenities: o.amenities || {},
+            yearBuilt: o.yearBuilt || o.specs?.['año de construcción'] || null,
+            orientation: o.orientation || o.specs?.['orientación'] || o.specs?.['orientacion'] || null,
+            link: o.link || null
         },
         pricePerSqM: Math.round(o.pricePerSqM),
         marketAverage: Math.round(avgPricePerSqM),

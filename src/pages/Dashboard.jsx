@@ -1,28 +1,120 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import './Dashboard.css'
 
 function Dashboard() {
-    const [filters, setFilters] = useState({
-        operation: 'venta',
-        propertyType: 'all',
-        priceMin: 0,
-        priceMax: 20000,
-        comuna: 'all'
-    })
-
     const [scraperConfig, setScraperConfig] = useState({
         operation: 'venta',
         propertyType: 'departamento',
-        comuna: 'las-condes',
-        pages: 3
+        comuna: 'las-condes-metropolitana',
+        pages: 5 // Limited to 5 pages max
     })
 
     const [scraping, setScraping] = useState(false)
     const [scrapeMessage, setScrapeMessage] = useState('')
+    const [scrapeProgress, setScrapeProgress] = useState(0)
+    const [analysis, setAnalysis] = useState(null)
+    const [loading, setLoading] = useState(false)
+    const [lastUpdate, setLastUpdate] = useState(null)
+    const [clearDataOnScrape, setClearDataOnScrape] = useState(false)
+
+    useEffect(() => {
+        fetchAnalysis()
+        // Check if there's an ongoing scraping process when component mounts
+        checkScrapingStatus()
+    }, [])
+
+    const checkScrapingStatus = async () => {
+        try {
+            const response = await fetch('http://localhost:3001/api/scrape-progress')
+            const data = await response.json()
+            
+            if (data.success && data.inProgress) {
+                // Resume scraping state
+                setScraping(true)
+                setScrapeProgress(data.progress || 0)
+                if (data.currentPage && data.totalPages) {
+                    const propertiesText = data.propertiesFound ? ` - ${data.propertiesFound} propiedades` : ''
+                    setScrapeMessage(`⏳ Página ${data.currentPage}/${data.totalPages}${propertiesText}`)
+                }
+                
+                // Start polling since scraping is in progress
+                startPolling()
+            }
+        } catch (error) {
+            console.error('error checking scraping status:', error)
+        }
+    }
+
+    const startPolling = () => {
+        const pollInterval = setInterval(async () => {
+            try {
+                const progressResponse = await fetch('http://localhost:3001/api/scrape-progress')
+                const progressData = await progressResponse.json()
+                
+                if (progressData.progress !== undefined) {
+                    setScrapeProgress(progressData.progress)
+                    
+                    if (progressData.currentPage && progressData.totalPages) {
+                        const propertiesText = progressData.propertiesFound ? ` - ${progressData.propertiesFound} propiedades` : ''
+                        setScrapeMessage(`⏳ Página ${progressData.currentPage}/${progressData.totalPages}${propertiesText}`)
+                    }
+                }
+                
+                if (progressData.completed) {
+                    clearInterval(pollInterval)
+                    setScrapeProgress(100)
+                    setScrapeMessage('✓ Completado, actualizando análisis...')
+                    await fetchAnalysis()
+                    setScrapeMessage('✓ Datos actualizados correctamente')
+                    setScraping(false)
+                    setScrapeProgress(0) // Reset progress after completion
+                }
+            } catch (error) {
+                console.error('error polling progress:', error)
+            }
+        }, 1000)
+        
+        return pollInterval
+    }
+
+    const fetchAnalysis = async () => {
+        setLoading(true)
+        try {
+            const response = await fetch('http://localhost:3001/api/analysis')
+            const data = await response.json()
+            
+            if (data.success) {
+                setAnalysis(data.analysis)
+                setLastUpdate(data.timestamp)
+            } else {
+                setAnalysis(null)
+                setLastUpdate(null)
+            }
+        } catch (error) {
+            console.error('error fetching analysis:', error)
+            setScrapeMessage('⚠️ No se puede conectar con el servidor. Verifique que el servicio backend esté activo.')
+        } finally {
+            setLoading(false)
+        }
+    }
 
     const handleScrape = async () => {
+        // Limpiar datos si está activado el toggle
+        if (clearDataOnScrape && analysis) {
+            try {
+                await fetch('http://localhost:3001/api/properties', {
+                    method: 'DELETE'
+                })
+                setAnalysis(null)
+                setLastUpdate(null)
+            } catch (error) {
+                console.error('error clearing data:', error)
+            }
+        }
+
         setScraping(true)
-        setScrapeMessage('Iniciando scraping...')
+        setScrapeProgress(0)
+        setScrapeMessage('⏳ Extrayendo datos del mercado...')
         
         try {
             const response = await fetch('http://localhost:3001/api/scrape', {
@@ -36,541 +128,101 @@ function Dashboard() {
             const data = await response.json()
             
             if (data.success) {
-                setScrapeMessage(`✅ Scraping iniciado! Los datos se actualizarán en breve. Ve a "Raw Data" o "Análisis IA" para ver los resultados.`)
+                setScrapeMessage('✓ Proceso iniciado')
+                setScraping(true)
+                setScrapeProgress(0)
+                
+                // Start polling for updates
+                startPolling()
             } else {
-                setScrapeMessage(`❌ Error: ${data.error}`)
+                setScrapeMessage(`✗ Error: ${data.error}`)
+                setScraping(false)
+                setScrapeProgress(0)
             }
         } catch (error) {
-            setScrapeMessage(`❌ Error: No se pudo conectar con el servidor. Asegúrate de ejecutar "yarn server" en otra terminal.`)
-            console.error('Scrape error:', error)
-        } finally {
-            setTimeout(() => {
-                setScraping(false)
-                setScrapeMessage('')
-            }, 5000)
+            setScrapeMessage('✗ Error de conexión con el servidor')
+            console.error('scrape error:', error)
+            setScraping(false)
+            setScrapeProgress(0)
         }
     }
 
-    const handleUseMockData = async () => {
-        setScraping(true)
-        setScrapeMessage('Generando datos de prueba...')
+    const handleClearData = async () => {
+        if (!window.confirm('¿Está seguro de que desea eliminar todas las propiedades analizadas? Esta acción no se puede deshacer.')) {
+            return
+        }
         
+        setLoading(true)
         try {
-            const mockData = await import('../../../server/scraper.js')
-            const properties = mockData.generateMockProperties({
-                operation: scraperConfig.operation,
-                propertyType: scraperConfig.propertyType,
-                comuna: scraperConfig.comuna,
-                count: scraperConfig.pages * 20
+            const response = await fetch('http://localhost:3001/api/properties', {
+                method: 'DELETE'
             })
             
-            setScrapeMessage(`✅ Se generaron ${properties.length} propiedades de prueba. Ve a "Raw Data" para verlas.`)
+            const data = await response.json()
+            
+            if (data.success) {
+                setAnalysis(null)
+                setLastUpdate(null)
+                setScrapeMessage('✓ Datos eliminados correctamente')
+            } else {
+                setScrapeMessage('✗ Error al eliminar datos')
+            }
         } catch (error) {
-            setScrapeMessage('❌ Error generando datos de prueba')
-            console.error('Mock data error:', error)
+            setScrapeMessage('✗ Error de conexión con el servidor')
+            console.error('clear error:', error)
         } finally {
-            setTimeout(() => {
-                setScraping(false)
-                setScrapeMessage('')
-            }, 5000)
+            setLoading(false)
         }
     }
 
-    // Datos hardcodeados simulando scraping de Portal Inmobiliario
-    const properties = [
-        {
-            id: 1,
-            title: "Moderno Departamento en Las Condes",
-            price: 185000000,
-            priceUF: 4500,
-            comuna: "Las Condes",
-            address: "Av. Apoquindo 6500",
-            bedrooms: 3,
-            bathrooms: 2,
-            parkings: 1,
-            sqMeters: 95,
-            type: "Departamento",
-            operation: "venta",
-            isNew: true,
-            image: "🏢",
-            realEstate: "Inmobiliaria Aconcagua"
-        },
-        {
-            id: 2,
-            title: "Casa con Jardín en Providencia",
-            price: 320000000,
-            priceUF: 7800,
-            comuna: "Providencia",
-            address: "Los Leones 1234",
-            bedrooms: 4,
-            bathrooms: 3,
-            parkings: 2,
-            sqMeters: 180,
-            type: "Casa",
-            operation: "venta",
-            isNew: false,
-            image: "🏠",
-            realEstate: "Inmobiliaria Manquehue"
-        },
-        {
-            id: 3,
-            title: "Estacionamiento Techado en Vitacura",
-            price: 25000000,
-            priceUF: 610,
-            comuna: "Vitacura",
-            address: "Av. Vitacura 5678",
-            bedrooms: 0,
-            bathrooms: 0,
-            parkings: 1,
-            sqMeters: 12,
-            type: "Estacionamiento",
-            operation: "venta",
-            isNew: true,
-            image: "🅿️",
-            realEstate: "Propiedades Independientes"
-        },
-        {
-            id: 4,
-            title: "Departamento Amoblado en Santiago Centro",
-            price: 850000,
-            priceUF: 20,
-            comuna: "Santiago",
-            address: "Alameda 2000",
-            bedrooms: 2,
-            bathrooms: 1,
-            parkings: 0,
-            sqMeters: 55,
-            type: "Departamento",
-            operation: "arriendo",
-            isNew: false,
-            image: "🏢",
-            realEstate: "Inmobiliaria Aconcagua"
-        },
-        {
-            id: 5,
-            title: "Oficina en Edificio Corporativo",
-            price: 95000000,
-            priceUF: 2320,
-            comuna: "Las Condes",
-            address: "Av. El Bosque Norte 500",
-            bedrooms: 0,
-            bathrooms: 2,
-            parkings: 3,
-            sqMeters: 120,
-            type: "Oficina",
-            operation: "venta",
-            isNew: true,
-            image: "🏢",
-            realEstate: "Inmobiliaria Manquehue"
-        },
-        {
-            id: 6,
-            title: "Bodega Industrial en Quilicura",
-            price: 150000000,
-            priceUF: 3660,
-            comuna: "Quilicura",
-            address: "Ruta 5 Norte Km 18",
-            bedrooms: 0,
-            bathrooms: 1,
-            parkings: 4,
-            sqMeters: 350,
-            type: "Bodega",
-            operation: "venta",
-            isNew: false,
-            image: "🏭",
-            realEstate: "Inmobiliaria del Sur"
-        },
-        {
-            id: 7,
-            title: "Departamento Nuevo en Ñuñoa",
-            price: 145000000,
-            priceUF: 3540,
-            comuna: "Ñuñoa",
-            address: "Irarrázaval 3456",
-            bedrooms: 2,
-            bathrooms: 2,
-            parkings: 1,
-            sqMeters: 72,
-            type: "Departamento",
-            operation: "venta",
-            isNew: true,
-            image: "🏢",
-            realEstate: "Inmobiliaria Aconcagua"
-        },
-        {
-            id: 8,
-            title: "Casa Familiar en La Reina",
-            price: 280000000,
-            priceUF: 6830,
-            comuna: "La Reina",
-            address: "Príncipe de Gales 8900",
-            bedrooms: 5,
-            bathrooms: 3,
-            parkings: 2,
-            sqMeters: 220,
-            type: "Casa",
-            operation: "venta",
-            isNew: false,
-            image: "🏠",
-            realEstate: "Propiedades Independientes"
-        },
-        {
-            id: 9,
-            title: "Lujoso Penthouse en Vitacura",
-            price: 450000000,
-            priceUF: 10975,
-            comuna: "Vitacura",
-            address: "Av. Kennedy 9000",
-            bedrooms: 4,
-            bathrooms: 4,
-            parkings: 3,
-            sqMeters: 250,
-            type: "Departamento",
-            operation: "venta",
-            isNew: true,
-            image: "🏢",
-            realEstate: "Inmobiliaria Manquehue"
-        },
-        {
-            id: 10,
-            title: "Departamento para Estudiantes en Santiago",
-            price: 450000,
-            priceUF: 11,
-            comuna: "Santiago",
-            address: "Arturo Prat 850",
-            bedrooms: 1,
-            bathrooms: 1,
-            parkings: 0,
-            sqMeters: 35,
-            type: "Departamento",
-            operation: "arriendo",
-            isNew: true,
-            image: "🏢",
-            realEstate: "Inmobiliaria del Sur"
-        },
-        {
-            id: 11,
-            title: "Casa Amplia con Piscina en Lo Barnechea",
-            price: 620000000,
-            priceUF: 15120,
-            comuna: "Las Condes",
-            address: "Camino El Alba 12000",
-            bedrooms: 6,
-            bathrooms: 5,
-            parkings: 4,
-            sqMeters: 380,
-            type: "Casa",
-            operation: "venta",
-            isNew: false,
-            image: "🏠",
-            realEstate: "Inmobiliaria Manquehue"
-        },
-        {
-            id: 12,
-            title: "Oficina Premium en Providencia",
-            price: 125000000,
-            priceUF: 3050,
-            comuna: "Providencia",
-            address: "Av. Providencia 1650",
-            bedrooms: 0,
-            bathrooms: 3,
-            parkings: 2,
-            sqMeters: 85,
-            type: "Oficina",
-            operation: "venta",
-            isNew: true,
-            image: "🏢",
-            realEstate: "Inmobiliaria Aconcagua"
-        },
-        {
-            id: 13,
-            title: "Casa en Condominio Cerrado en La Reina",
-            price: 385000000,
-            priceUF: 9390,
-            comuna: "La Reina",
-            address: "Av. Larraín 8765",
-            bedrooms: 4,
-            bathrooms: 3,
-            parkings: 2,
-            sqMeters: 210,
-            type: "Casa",
-            operation: "venta",
-            isNew: false,
-            image: "🏠",
-            realEstate: "Inmobiliaria Aconcagua"
-        },
-        {
-            id: 14,
-            title: "Departamento con Vista Panorámica en Ñuñoa",
-            price: 1150000,
-            priceUF: 28,
-            comuna: "Ñuñoa",
-            address: "Av. Grecia 5432",
-            bedrooms: 3,
-            bathrooms: 2,
-            parkings: 1,
-            sqMeters: 85,
-            type: "Departamento",
-            operation: "arriendo",
-            isNew: true,
-            image: "🏢",
-            realEstate: "Propiedades Independientes"
-        },
-        {
-            id: 15,
-            title: "Bodega de Almacenamiento en Pudahuel",
-            price: 85000000,
-            priceUF: 2075,
-            comuna: "Quilicura",
-            address: "Ruta 68 Km 15",
-            bedrooms: 0,
-            bathrooms: 1,
-            parkings: 2,
-            sqMeters: 280,
-            type: "Bodega",
-            operation: "venta",
-            isNew: false,
-            image: "🏭",
-            realEstate: "Inmobiliaria del Sur"
-        },
-        {
-            id: 16,
-            title: "Estacionamiento Doble en Las Condes",
-            price: 35000000,
-            priceUF: 855,
-            comuna: "Las Condes",
-            address: "Av. Manquehue Norte 1500",
-            bedrooms: 0,
-            bathrooms: 0,
-            parkings: 2,
-            sqMeters: 24,
-            type: "Estacionamiento",
-            operation: "venta",
-            isNew: true,
-            image: "🅿️",
-            realEstate: "Inmobiliaria Manquehue"
-        },
-        {
-            id: 17,
-            title: "Departamento Luminoso en Providencia",
-            price: 168000000,
-            priceUF: 4100,
-            comuna: "Providencia",
-            address: "General Bustamante 200",
-            bedrooms: 2,
-            bathrooms: 2,
-            parkings: 1,
-            sqMeters: 68,
-            type: "Departamento",
-            operation: "venta",
-            isNew: true,
-            image: "🏢",
-            realEstate: "Inmobiliaria Aconcagua"
-        },
-        {
-            id: 18,
-            title: "Casa Remodelada en Santiago Centro",
-            price: 240000000,
-            priceUF: 5860,
-            comuna: "Santiago",
-            address: "República 650",
-            bedrooms: 3,
-            bathrooms: 2,
-            parkings: 1,
-            sqMeters: 145,
-            type: "Casa",
-            operation: "venta",
-            isNew: false,
-            image: "🏠",
-            realEstate: "Propiedades Independientes"
-        },
-        {
-            id: 19,
-            title: "Oficina Compartida en Edificio Nuevo",
-            price: 650000,
-            priceUF: 16,
-            comuna: "Providencia",
-            address: "Suecia 155",
-            bedrooms: 0,
-            bathrooms: 2,
-            parkings: 0,
-            sqMeters: 45,
-            type: "Oficina",
-            operation: "arriendo",
-            isNew: true,
-            image: "🏢",
-            realEstate: "Inmobiliaria Manquehue"
-        },
-        {
-            id: 20,
-            title: "Departamento con Terraza en Las Condes",
-            price: 215000000,
-            priceUF: 5245,
-            comuna: "Las Condes",
-            address: "Isidora Goyenechea 3000",
-            bedrooms: 3,
-            bathrooms: 2,
-            parkings: 2,
-            sqMeters: 105,
-            type: "Departamento",
-            operation: "venta",
-            isNew: true,
-            image: "🏢",
-            realEstate: "Inmobiliaria Aconcagua"
-        },
-        {
-            id: 21,
-            title: "Casa Colonial Restaurada en Barrio Brasil",
-            price: 195000000,
-            priceUF: 4760,
-            comuna: "Santiago",
-            address: "Huérfanos 2800",
-            bedrooms: 3,
-            bathrooms: 2,
-            parkings: 0,
-            sqMeters: 160,
-            type: "Casa",
-            operation: "venta",
-            isNew: false,
-            image: "🏠",
-            realEstate: "Inmobiliaria del Sur"
-        },
-        {
-            id: 22,
-            title: "Bodega Logística con Oficinas",
-            price: 280000000,
-            priceUF: 6830,
-            comuna: "Quilicura",
-            address: "Ruta 5 Norte Km 22",
-            bedrooms: 0,
-            bathrooms: 3,
-            parkings: 8,
-            sqMeters: 650,
-            type: "Bodega",
-            operation: "venta",
-            isNew: true,
-            image: "🏭",
-            realEstate: "Inmobiliaria del Sur"
-        },
-        {
-            id: 23,
-            title: "Studio Amoblado en Ñuñoa",
-            price: 380000,
-            priceUF: 9,
-            comuna: "Ñuñoa",
-            address: "Plaza Egaña 1200",
-            bedrooms: 1,
-            bathrooms: 1,
-            parkings: 0,
-            sqMeters: 28,
-            type: "Departamento",
-            operation: "arriendo",
-            isNew: false,
-            image: "🏢",
-            realEstate: "Propiedades Independientes"
-        },
-        {
-            id: 24,
-            title: "Departamento Premium en Edificio Inteligente",
-            price: 295000000,
-            priceUF: 7200,
-            comuna: "Vitacura",
-            address: "Av. Bicentenario 3800",
-            bedrooms: 3,
-            bathrooms: 3,
-            parkings: 2,
-            sqMeters: 135,
-            type: "Departamento",
-            operation: "venta",
-            isNew: true,
-            image: "🏢",
-            realEstate: "Inmobiliaria Manquehue"
-        }
-    ]
-
-    const filteredProperties = properties.filter(prop => {
-        if (filters.operation !== 'all' && prop.operation !== filters.operation) return false
-        if (filters.propertyType !== 'all' && prop.type !== filters.propertyType) return false
-        if (prop.priceUF < filters.priceMin || prop.priceUF > filters.priceMax) return false
-        if (filters.comuna !== 'all' && prop.comuna !== filters.comuna) return false
-        return true
-    })
-
-    const stats = {
-        totalProperties: filteredProperties.length,
-        averagePrice: filteredProperties.length > 0
-            ? Math.round(filteredProperties.reduce((acc, p) => acc + p.price, 0) / filteredProperties.length)
-            : 0,
-        averagePriceUF: filteredProperties.length > 0
-            ? Math.round(filteredProperties.reduce((acc, p) => acc + p.priceUF, 0) / filteredProperties.length)
-            : 0,
-        newProperties: filteredProperties.filter(p => p.isNew).length,
-        trend: "+5.2%"
+    const formatUF = (uf) => {
+        if (!uf || isNaN(uf)) return 'N/A'
+        return `${Math.round(uf).toLocaleString('es-CL')} UF`
     }
 
-    // Calcular insights avanzados
-    const propertiesWithBathrooms = filteredProperties.filter(p => p.bathrooms > 0)
-    const avgPricePerBathroom = propertiesWithBathrooms.length > 0
-        ? Math.round(propertiesWithBathrooms.reduce((acc, p) => acc + (p.price / p.bathrooms), 0) / propertiesWithBathrooms.length)
-        : 0
+    const formatComunaName = (comunaSlug) => {
+        if (!comunaSlug) return ''
+        // convert "las-condes-metropolitana" to "Las Condes"
+        const name = comunaSlug.replace('-metropolitana', '').split('-').map(word => 
+            word.charAt(0).toUpperCase() + word.slice(1)
+        ).join(' ')
+        return name
+    }
 
-    const propertiesWithSqMeters = filteredProperties.filter(p => p.sqMeters > 0)
-    const avgPricePerSqMeter = propertiesWithSqMeters.length > 0
-        ? Math.round(propertiesWithSqMeters.reduce((acc, p) => acc + (p.price / p.sqMeters), 0) / propertiesWithSqMeters.length)
-        : 0
-
-    // Contar propiedades por inmobiliaria
-    const realEstateCount = {}
-    filteredProperties.forEach(p => {
-        if (p.realEstate) {
-            realEstateCount[p.realEstate] = (realEstateCount[p.realEstate] || 0) + 1
-        }
-    })
-    const topRealEstates = Object.entries(realEstateCount)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 3)
-
-    // Contar propiedades por comuna
-    const comunaCount = {}
-    filteredProperties.forEach(p => {
-        comunaCount[p.comuna] = (comunaCount[p.comuna] || 0) + 1
-    })
-    const topComunas = Object.entries(comunaCount)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 3)
-
-    // Análisis de dormitorios
-    const propertiesWithBedrooms = filteredProperties.filter(p => p.bedrooms > 0)
-    const avgBedrooms = propertiesWithBedrooms.length > 0
-        ? (propertiesWithBedrooms.reduce((acc, p) => acc + p.bedrooms, 0) / propertiesWithBedrooms.length).toFixed(1)
-        : 0
-
-    const formatPrice = (price) => {
-        if (price >= 1000000) {
-            return `$${(price / 1000000).toFixed(1)}M`
-        }
-        return `$${price.toLocaleString('es-CL')}`
+    const buildPortalInmobiliarioUrl = () => {
+        return `https://www.portalinmobiliario.com/${scraperConfig.operation}/${scraperConfig.propertyType}/${scraperConfig.comuna}`
     }
 
     return (
         <div className="dashboard">
             <div className="dashboard-header">
-                <h1>Análisis de Propiedades</h1>
-                <p>Datos extraídos de Portal Inmobiliario en tiempo real</p>
+                <h1>Panel de Análisis de Mercado</h1>
+                <p>Inteligencia de datos inmobiliarios en tiempo real</p>
             </div>
 
             <div className="dashboard-content">
-                {/* Web Scraper Section */}
+                {/* disclaimer */}
+                <div className="disclaimer-box">
+                    <div className="disclaimer-content">
+                        <strong>Requisitos:</strong> macOS • Cuenta en Portal Inmobiliario • Primera vez: login manual (60s)
+                    </div>
+                </div>
+
+                {/* scraper section */}
                 <div className="scraper-section">
                     <div className="scraper-header">
-                        <h2>🕷️ Web Scraper</h2>
+                        <div>
+                            <h2>Configuración de Extracción</h2>
+                            <p className="scraper-subtitle">Seleccione los parámetros para extraer datos del mercado</p>
+                        </div>
                         <span className="scraper-status">
-                            {scraping ? '⏳ Ejecutando...' : '✅ Listo'}
+                            {scraping ? '⏳ Procesando...' : lastUpdate ? `✓ Última actualización: ${new Date(lastUpdate).toLocaleString('es-CL')}` : '○ Sin datos'}
                         </span>
                     </div>
 
                     <div className="scraper-controls">
-                        <div>
+                        <div className="control-group">
+                            <label>Tipo de Operación</label>
                             <select
                                 value={scraperConfig.operation}
                                 onChange={(e) => setScraperConfig({ ...scraperConfig, operation: e.target.value })}
@@ -578,319 +230,576 @@ function Dashboard() {
                             >
                                 <option value="venta">Venta</option>
                                 <option value="arriendo">Arriendo</option>
+                                <option value="arriendo-temporal">Arriendo Temporal (en desarrollo)</option>
                             </select>
                         </div>
-                        <div>
+                        <div className="control-group">
+                            <label>Tipo de Propiedad</label>
                             <select
                                 value={scraperConfig.propertyType}
                                 onChange={(e) => setScraperConfig({ ...scraperConfig, propertyType: e.target.value })}
                                 disabled={scraping}
                             >
                                 <option value="departamento">Departamento</option>
-                                <option value="casa">Casa</option>
-                                <option value="oficina">Oficina</option>
-                                <option value="bodega">Bodega</option>
-                                <option value="estacionamiento">Estacionamiento</option>
+                                <option value="casa">Casa (en desarrollo)</option>
+                                <option value="oficina">Oficina (en desarrollo)</option>
+                                <option value="bodega">Bodega (en desarrollo)</option>
+                                <option value="estacionamiento">Estacionamiento (en desarrollo)</option>
+                                <option value="local-comercial">Local Comercial (en desarrollo)</option>
+                                <option value="terreno">Terreno (en desarrollo)</option>
+                                <option value="sitio">Sitio (en desarrollo)</option>
+                                <option value="parcela">Parcela (en desarrollo)</option>
                             </select>
                         </div>
-                        <div>
+                        <div className="control-group">
+                            <label>Comuna / Sector</label>
                             <select
                                 value={scraperConfig.comuna}
                                 onChange={(e) => setScraperConfig({ ...scraperConfig, comuna: e.target.value })}
                                 disabled={scraping}
                             >
-                                <option value="las-condes">Las Condes</option>
-                                <option value="providencia">Providencia</option>
-                                <option value="vitacura">Vitacura</option>
-                                <option value="santiago">Santiago</option>
-                                <option value="nunoa">Ñuñoa</option>
-                                <option value="la-reina">La Reina</option>
-                                <option value="quilicura">Quilicura</option>
+                                <option value="las-condes-metropolitana">Las Condes</option>
+                                <option value="vitacura-metropolitana">Vitacura</option>
+                                <option value="providencia-metropolitana">Providencia (en desarrollo)</option>
+                                <option value="santiago-metropolitana">Santiago Centro (en desarrollo)</option>
+                                <option value="nunoa-metropolitana">Ñuñoa (en desarrollo)</option>
+                                <option value="la-reina-metropolitana">La Reina (en desarrollo)</option>
+                                <option value="quilicura-metropolitana">Quilicura (en desarrollo)</option>
+                                <option value="lo-barnechea-metropolitana">Lo Barnechea (en desarrollo)</option>
+                                <option value="maipu-metropolitana">Maipú (en desarrollo)</option>
+                                <option value="la-florida-metropolitana">La Florida (en desarrollo)</option>
+                                <option value="penalolen-metropolitana">Peñalolén (en desarrollo)</option>
+                                <option value="macul-metropolitana">Macul (en desarrollo)</option>
+                                <option value="huechuraba-metropolitana">Huechuraba (en desarrollo)</option>
+                                <option value="pudahuel-metropolitana">Pudahuel (en desarrollo)</option>
+                                <option value="estacion-central-metropolitana">Estación Central (en desarrollo)</option>
                             </select>
                         </div>
-                        <div>
-                            <input
-                                type="number"
-                                min="1"
-                                max="10"
+                        <div className="control-group">
+                            <label>Páginas a Procesar</label>
+                            <select
                                 value={scraperConfig.pages}
                                 onChange={(e) => setScraperConfig({ ...scraperConfig, pages: Number(e.target.value) })}
-                                placeholder="Páginas"
                                 disabled={scraping}
-                            />
+                            >
+                                <option value="1">1 página (~48 propiedades)</option>
+                                <option value="2">2 páginas (~96 propiedades)</option>
+                                <option value="3">3 páginas (~144 propiedades)</option>
+                                <option value="4">4 páginas (~192 propiedades)</option>
+                                <option value="5">5 páginas (~240 propiedades)</option>
+                            </select>
                         </div>
                     </div>
 
                     <div className="scraper-actions">
-                        <button 
-                            className="scraper-button primary" 
+                        <button
+                            className="scraper-button primary"
                             onClick={handleScrape}
                             disabled={scraping}
                         >
-                            <span>🚀</span> Ejecutar Scraping Real
+                            <span>▶</span> Iniciar Extracción
                         </button>
-                        <button 
-                            className="scraper-button secondary" 
-                            onClick={handleUseMockData}
+                        <button
+                            className="scraper-button secondary"
+                            onClick={() => window.location.reload()}
                             disabled={scraping}
                         >
-                            <span>🎲</span> Usar Datos de Prueba
+                            <span>⟳</span> Recargar Página
                         </button>
+                        <a
+                            href={buildPortalInmobiliarioUrl()}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="scraper-button link"
+                        >
+                            <span>🔗</span> Ver en Portal Inmobiliario
+                        </a>
+                        <label className="toggle-option-inline">
+                            <input
+                                type="checkbox"
+                                checked={clearDataOnScrape}
+                                onChange={(e) => setClearDataOnScrape(e.target.checked)}
+                                disabled={scraping}
+                            />
+                            <span>Limpiar datos existentes</span>
+                        </label>
                     </div>
 
                     {scrapeMessage && (
-                        <div className="scraper-info">
+                        <div className={`scraper-message ${scrapeMessage.includes('✗') ? 'error' : 'success'}`}>
                             <p>{scrapeMessage}</p>
                         </div>
                     )}
 
-                    <div className="scraper-info">
-                        <p>
-                            <strong>📌 Cómo usar:</strong>
-                        </p>
-                        <p>
-                            1️⃣ Configura los parámetros de búsqueda arriba<br />
-                            2️⃣ Haz clic en "Ejecutar Scraping Real" para extraer datos reales de Portal Inmobiliario<br />
-                            3️⃣ O usa "Datos de Prueba" para generar datos simulados (más rápido)<br />
-                            4️⃣ Ve a "Raw Data" para ver los datos sin procesar<br />
-                            5️⃣ Ve a "Análisis IA" para ver análisis avanzados y oportunidades
-                        </p>
-                        <p>
-                            <strong>⚠️ Nota:</strong> Para que funcione el scraping real, debes tener el servidor backend corriendo: <code>yarn server</code>
-                        </p>
+                    <div className="scraper-info-professional">
+                        <div className="info-row">
+                            <strong>Fuente:</strong>
+                            <span>Portal Inmobiliario Chile</span>
+                        </div>
+                        <div className="info-row">
+                            <strong>Método:</strong>
+                            <span>Navegación headless con Puppeteer-core</span>
+                        </div>
+                        <div className="info-row">
+                            <strong>Procesamiento:</strong>
+                            <span>~48 propiedades por página (7s por propiedad = ~336s/página = 5.6min/página)</span>
+                        </div>
                     </div>
+
+                    {/* Progress info - direct to terminal */}
+                    {scraping && (
+                        <div className="progress-section terminal-message">
+                            <div className="terminal-icon">⚠️</div>
+                            <div className="terminal-content">
+                                <h3>Extracción en Proceso</h3>
+                                <p>La sincronización de progreso en tiempo real aún no está lista.</p>
+                                <p><strong>Por favor, revise la terminal del servidor para ver el progreso detallado.</strong></p>
+                                <div className="terminal-tips">
+                                    <div>📊 Verá mensajes como: <code>[scraper] progress: 50% (5/10 pages)</code></div>
+                                    <div>✓ El proceso continúa en segundo plano</div>
+                                    <div>⏱️ Tiempo estimado: ~5-6 minutos por página</div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
-                {/* Stats Cards */}
-                <div className="stats-grid">
-                    <div className="stat-box">
-                        <div className="stat-icon">🏘️</div>
-                        <div className="stat-info">
-                            <div className="stat-value">{stats.totalProperties}</div>
-                            <div className="stat-label">Propiedades Encontradas</div>
-                        </div>
+                {/* analysis display */}
+                {loading ? (
+                    <div className="loading-container">
+                        <div className="spinner"></div>
+                        <p>Cargando análisis...</p>
                     </div>
-                    <div className="stat-box">
-                        <div className="stat-icon">💰</div>
-                        <div className="stat-info">
-                            <div className="stat-value">{stats.averagePriceUF} UF</div>
-                            <div className="stat-label">Precio Promedio</div>
-                        </div>
+                ) : !analysis || analysis.summary.totalProperties === 0 ? (
+                    <div className="empty-state">
+                        <div className="empty-icon">📊</div>
+                        <h3>No hay datos para analizar</h3>
+                        <p>Ejecute el scraper para generar análisis del mercado</p>
                     </div>
-                    <div className="stat-box">
-                        <div className="stat-icon">📈</div>
-                        <div className="stat-info">
-                            <div className="stat-value">{stats.trend}</div>
-                            <div className="stat-label">Tendencia de Precios</div>
-                        </div>
-                    </div>
-                    <div className="stat-box">
-                        <div className="stat-icon">✨</div>
-                        <div className="stat-info">
-                            <div className="stat-value">{stats.newProperties}</div>
-                            <div className="stat-label">Nuevas esta Semana</div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Advanced Insights */}
-                <div className="insights-section">
-                    <h2>📊 Insights del Mercado</h2>
-                    <div className="insights-grid">
-                        <div className="insight-card">
-                            <div className="insight-header">
-                                <span className="insight-icon">🚿</span>
-                                <h3>Precio por Baño</h3>
+                ) : (
+                    <>
+                        {/* Filter info banner */}
+                        {analysis.filterInfo && analysis.filterInfo.excluded > 0 && (
+                            <div className="filter-info-banner">
+                                <div className="filter-icon">🔍</div>
+                                <div className="filter-content">
+                                    <strong>Filtro Aplicado:</strong> Se excluyeron {analysis.filterInfo.excluded} propiedades con precio superior a {analysis.filterInfo.maxPriceUF.toLocaleString('es-CL')} UF para un análisis más representativo del mercado.
+                                    <span className="filter-details">({analysis.filterInfo.totalScraped} scrapeadas → {analysis.filterInfo.totalAnalyzed} analizadas)</span>
+                                </div>
                             </div>
-                            <div className="insight-value">{formatPrice(avgPricePerBathroom)}</div>
-                            <p className="insight-description">Promedio de precio por cada baño en las propiedades seleccionadas</p>
-                        </div>
+                        )}
 
-                        <div className="insight-card">
-                            <div className="insight-header">
-                                <span className="insight-icon">📐</span>
-                                <h3>Precio por m²</h3>
+                        {/* summary stats */}
+                        <div className="stats-grid">
+                            <div className="stat-box">
+                                <div className="stat-icon">🏘️</div>
+                                <div className="stat-info">
+                                    <div className="stat-value">{analysis.summary.totalProperties}</div>
+                                    <div className="stat-label">Propiedades Analizadas</div>
+                                </div>
                             </div>
-                            <div className="insight-value">{formatPrice(avgPricePerSqMeter)}/m²</div>
-                            <p className="insight-description">Valor promedio del metro cuadrado en el mercado actual</p>
-                        </div>
-
-                        <div className="insight-card">
-                            <div className="insight-header">
-                                <span className="insight-icon">🛏️</span>
-                                <h3>Dormitorios Promedio</h3>
+                            <div className="stat-box">
+                                <div className="stat-icon">💰</div>
+                                <div className="stat-info">
+                                    <div className="stat-value">{formatUF(analysis.summary.averagePrice)}</div>
+                                    <div className="stat-label">Precio Promedio</div>
+                                </div>
                             </div>
-                            <div className="insight-value">{avgBedrooms}</div>
-                            <p className="insight-description">Cantidad promedio de dormitorios en las propiedades analizadas</p>
+                            <div className="stat-box">
+                                <div className="stat-icon">📐</div>
+                                <div className="stat-info">
+                                    <div className="stat-value">{Math.round(analysis.summary.averageArea)}m²</div>
+                                    <div className="stat-label">Superficie Promedio</div>
+                                </div>
+                            </div>
+                            <div className="stat-box">
+                                <div className="stat-icon">📍</div>
+                                <div className="stat-info">
+                                    <div className="stat-value">{formatComunaName(scraperConfig.comuna)}</div>
+                                    <div className="stat-label">Comuna Analizada</div>
+                                </div>
+                            </div>
                         </div>
 
-                        <div className="insight-card">
-                            <div className="insight-header">
-                                <span className="insight-icon">🏢</span>
-                                <h3>Principales Inmobiliarias</h3>
-                            </div>
-                            <div className="insight-list">
-                                {topRealEstates.map(([name, count], index) => (
-                                    <div key={index} className="insight-item">
-                                        <span className="insight-rank">#{index + 1}</span>
-                                        <span className="insight-name">{name}</span>
-                                        <span className="insight-count">{count} prop.</span>
-                                    </div>
-                                ))}
-                            </div>
-                            <p className="insight-description">Inmobiliarias con mayor presencia en el mercado</p>
-                        </div>
-
-                        <div className="insight-card">
-                            <div className="insight-header">
-                                <span className="insight-icon">📍</span>
-                                <h3>Comunas con Mayor Oferta</h3>
-                            </div>
-                            <div className="insight-list">
-                                {topComunas.map(([name, count], index) => (
-                                    <div key={index} className="insight-item">
-                                        <span className="insight-rank">#{index + 1}</span>
-                                        <span className="insight-name">{name}</span>
-                                        <span className="insight-count">{count} prop.</span>
-                                    </div>
-                                ))}
-                            </div>
-                            <p className="insight-description">Zonas con mayor disponibilidad de propiedades</p>
-                        </div>
-
-                        <div className="insight-card highlight">
-                            <div className="insight-header">
-                                <span className="insight-icon">🎯</span>
-                                <h3>Mejor Relación Precio/m²</h3>
-                            </div>
-                            {propertiesWithSqMeters.length > 0 && (() => {
-                                const bestValue = propertiesWithSqMeters.reduce((best, p) => {
-                                    const pricePerSqMeter = p.price / p.sqMeters
-                                    return !best || pricePerSqMeter < (best.price / best.sqMeters) ? p : best
-                                }, null)
-                                return (
-                                    <>
-                                        <div className="insight-value">{bestValue.comuna}</div>
-                                        <p className="insight-description">{bestValue.title}</p>
-                                        <div className="insight-detail">
-                                            {formatPrice(Math.round(bestValue.price / bestValue.sqMeters))}/m² • {bestValue.sqMeters}m²
+                        {/* price analysis */}
+                        {analysis.priceAnalysis && analysis.priceAnalysis.ufStats && (
+                                <div className="analysis-section">
+                                    <h2>Análisis de Precios</h2>
+                                    <div className="analysis-grid">
+                                        <div className="analysis-card wide">
+                                            <h3>Distribución por Rangos de Precio</h3>
+                                            <div className="distribution-chart">
+                                            {Object.entries(analysis.priceAnalysis.distribution).map(([range, count]) => {
+                                                const maxCount = Math.max(...Object.values(analysis.priceAnalysis.distribution))
+                                                const percentage = maxCount > 0 ? (count / maxCount) * 100 : 0
+                                                
+                                                return (
+                                                    <div key={range} className="distribution-bar">
+                                                        <div className="bar-label">{range} UF</div>
+                                                        <div className="bar-container">
+                                                            <div 
+                                                                className="bar-fill" 
+                                                                style={{ width: `${percentage}%` }}
+                                                            >
+                                                            <span className="bar-value">{count}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )
+                                            })}
                                         </div>
-                                    </>
-                                )
-                            })()}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Filters */}
-                <div className="filters-section">
-                    <h2>Filtros de Búsqueda</h2>
-                    <div className="filters-grid">
-                        <div className="filter-group">
-                            <label>Tipo de Operación</label>
-                            <select
-                                value={filters.operation}
-                                onChange={(e) => setFilters({ ...filters, operation: e.target.value })}
-                            >
-                                <option value="all">Todos</option>
-                                <option value="venta">Venta</option>
-                                <option value="arriendo">Arriendo</option>
-                            </select>
-                        </div>
-
-                        <div className="filter-group">
-                            <label>Tipo de Propiedad</label>
-                            <select
-                                value={filters.propertyType}
-                                onChange={(e) => setFilters({ ...filters, propertyType: e.target.value })}
-                            >
-                                <option value="all">Todas</option>
-                                <option value="Departamento">Departamento</option>
-                                <option value="Casa">Casa</option>
-                                <option value="Estacionamiento">Estacionamiento</option>
-                                <option value="Bodega">Bodega</option>
-                                <option value="Oficina">Oficina</option>
-                            </select>
-                        </div>
-
-                        <div className="filter-group">
-                            <label>Comuna</label>
-                            <select
-                                value={filters.comuna}
-                                onChange={(e) => setFilters({ ...filters, comuna: e.target.value })}
-                            >
-                                <option value="all">Todas</option>
-                                <option value="Las Condes">Las Condes</option>
-                                <option value="Providencia">Providencia</option>
-                                <option value="Vitacura">Vitacura</option>
-                                <option value="Santiago">Santiago</option>
-                                <option value="Ñuñoa">Ñuñoa</option>
-                                <option value="La Reina">La Reina</option>
-                                <option value="Quilicura">Quilicura</option>
-                            </select>
-                        </div>
-
-                        <div className="filter-group">
-                            <label>Rango de Precio (UF)</label>
-                            <div className="price-range">
-                                <input
-                                    type="number"
-                                    placeholder="Min UF"
-                                    value={filters.priceMin}
-                                    onChange={(e) => setFilters({ ...filters, priceMin: Number(e.target.value) })}
-                                />
-                                <span>-</span>
-                                <input
-                                    type="number"
-                                    placeholder="Max UF"
-                                    value={filters.priceMax}
-                                    onChange={(e) => setFilters({ ...filters, priceMax: Number(e.target.value) })}
-                                />
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Properties Grid */}
-                <div className="properties-section">
-                    <h2>Propiedades Disponibles</h2>
-                    <div className="properties-grid">
-                        {filteredProperties.map(property => (
-                            <div key={property.id} className="property-card">
-                                {property.isNew && <div className="new-badge">Nueva</div>}
-                                <div className="property-image">{property.image}</div>
-                                <div className="property-info">
-                                    <h3>{property.title}</h3>
-                                    <div className="property-price">
-                                        {formatPrice(property.price)}
-                                        {property.priceUF > 0 && (
-                                            <span className="price-uf"> ({property.priceUF} UF)</span>
-                                        )}
                                     </div>
-                                    <div className="property-location">
-                                        📍 {property.comuna} - {property.address}
+                                    
+                                    <div className="analysis-card">
+                                        <h3>Estadísticas Generales</h3>
+                                        <div className="metric-list">
+                                            <div className="metric-item">
+                                                <span>Promedio:</span>
+                                                <strong>{formatUF(analysis.priceAnalysis.ufStats.average)}</strong>
+                                            </div>
+                                            <div className="metric-item">
+                                                <span>Mediana:</span>
+                                                <strong>{formatUF(analysis.priceAnalysis.ufStats.median)}</strong>
+                                            </div>
+                                            <div className="metric-item">
+                                                <span>Mínimo:</span>
+                                                <strong>{formatUF(analysis.priceAnalysis.ufStats.min)}</strong>
+                                            </div>
+                                            <div className="metric-item">
+                                                <span>Máximo:</span>
+                                                <strong>{formatUF(analysis.priceAnalysis.ufStats.max)}</strong>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div className="property-features">
-                                        {property.bedrooms > 0 && <span>🛏️ {property.bedrooms} dorm</span>}
-                                        {property.bathrooms > 0 && <span>🚿 {property.bathrooms} baños</span>}
-                                        {property.parkings > 0 && <span>🅿️ {property.parkings} est</span>}
-                                        <span>📐 {property.sqMeters}m²</span>
-                                    </div>
-                                    <div className="property-type-badge">{property.type}</div>
-                                    {property.sqMeters > 0 && (
-                                        <div className="property-price-per-meter">
-                                            {formatPrice(Math.round(property.price / property.sqMeters))}/m²
+
+                                    {analysis.priceAnalysis.pricePerSqMeterUF && (
+                                        <div className="analysis-card">
+                                            <h3>Precio por m²</h3>
+                                            <div className="metric-list">
+                                                <div className="metric-item">
+                                                    <span>Promedio:</span>
+                                                    <strong>{analysis.priceAnalysis.pricePerSqMeterUF.average.toFixed(1)} UF/m²</strong>
+                                                </div>
+                                                <div className="metric-item">
+                                                    <span>Mediana:</span>
+                                                    <strong>{analysis.priceAnalysis.pricePerSqMeterUF.median.toFixed(1)} UF/m²</strong>
+                                                </div>
+                                                <div className="metric-item">
+                                                    <span>Mínimo:</span>
+                                                    <strong>{analysis.priceAnalysis.pricePerSqMeterUF.min.toFixed(1)} UF/m²</strong>
+                                                </div>
+                                                <div className="metric-item">
+                                                    <span>Máximo:</span>
+                                                    <strong>{analysis.priceAnalysis.pricePerSqMeterUF.max.toFixed(1)} UF/m²</strong>
+                                                </div>
+                                            </div>
                                         </div>
                                     )}
                                 </div>
                             </div>
-                        ))}
-                    </div>
-                </div>
+                        )}
+
+                        {/* neighborhoods analysis */}
+                        {analysis.locationAnalysis && analysis.locationAnalysis.topNeighborhoods && analysis.locationAnalysis.topNeighborhoods.length > 0 && (
+                            <div className="analysis-section">
+                                <h2>Análisis por Sectores</h2>
+                                <p className="section-description">
+                                    {analysis.locationAnalysis.totalNeighborhoods} sectores identificados en {formatComunaName(scraperConfig.comuna)}
+                                </p>
+                                <div className="neighborhoods-grid">
+                                    {analysis.locationAnalysis.topNeighborhoods.slice(0, 6).map((n, index) => (
+                                        <div key={index} className="neighborhood-card">
+                                            <div className="neighborhood-rank">#{index + 1}</div>
+                                            <h4>{n.neighborhood}</h4>
+                                            <div className="neighborhood-stats">
+                                                <div className="stat-row">
+                                                    <span>Propiedades:</span>
+                                                    <strong>{n.count}</strong>
+                                                </div>
+                                                {n.avgPriceUF > 0 && (
+                                                    <div className="stat-row">
+                                                        <span>Precio Promedio:</span>
+                                                        <strong>{formatUF(n.avgPriceUF)}</strong>
+                                                    </div>
+                                                )}
+                                                {n.avgArea > 0 && (
+                                                    <div className="stat-row">
+                                                        <span>Superficie Promedio:</span>
+                                                        <strong>{Math.round(n.avgArea)}m²</strong>
+                                                    </div>
+                                                )}
+                                                {n.avgPricePerSqMeterUF && (
+                                                    <div className="stat-row highlight">
+                                                        <span>Precio/m²:</span>
+                                                        <strong>{n.avgPricePerSqMeterUF.toFixed(1)} UF/m²</strong>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* amenities analysis */}
+                        {analysis.amenitiesAnalysis && (analysis.amenitiesAnalysis.parkingImpact || analysis.amenitiesAnalysis.bodegasImpact || (analysis.amenitiesAnalysis.features && Object.keys(analysis.amenitiesAnalysis.features).length > 0) || (analysis.amenitiesAnalysis.valuableCombinations && analysis.amenitiesAnalysis.valuableCombinations.length > 0)) && (
+                            <div className="analysis-section">
+                                <h2>Análisis de Características</h2>
+                                
+                                <div className="amenities-grid">
+                                    {analysis.amenitiesAnalysis.parkingImpact && (
+                                        <div className="amenity-impact-card">
+                                            <h3>Impacto de Estacionamientos</h3>
+                                            <div className="impact-comparison">
+                                                <div className="impact-side">
+                                                    <div className="impact-label">con estacionamiento</div>
+                                                    <div className="impact-count">{analysis.amenitiesAnalysis.parkingImpact.withParking.count} prop.</div>
+                                                    <div className="impact-price">
+                                                        {formatUF(analysis.amenitiesAnalysis.parkingImpact.withParking.avgPriceUF)}
+                                                    </div>
+                                                    <div className="impact-detail">
+                                                        Promedio: {analysis.amenitiesAnalysis.parkingImpact.withParking.avgParkingSpaces.toFixed(1)} espacios
+                                                    </div>
+                                                </div>
+                                                <div className="impact-divider">vs</div>
+                                                <div className="impact-side">
+                                                    <div className="impact-label">sin estacionamiento</div>
+                                                    <div className="impact-count">{analysis.amenitiesAnalysis.parkingImpact.withoutParking.count} prop.</div>
+                                                    <div className="impact-price">
+                                                        {formatUF(analysis.amenitiesAnalysis.parkingImpact.withoutParking.avgPriceUF)}
+                                                    </div>
+                                                    <div className="impact-detail">
+                                                        Diferencia: {formatUF(
+                                                            analysis.amenitiesAnalysis.parkingImpact.withParking.avgPriceUF - 
+                                                            analysis.amenitiesAnalysis.parkingImpact.withoutParking.avgPriceUF
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {analysis.amenitiesAnalysis.bodegasImpact && (
+                                        <div className="amenity-impact-card">
+                                            <h3>Impacto de Bodegas</h3>
+                                            <div className="impact-comparison">
+                                                <div className="impact-side">
+                                                    <div className="impact-label">con bodega</div>
+                                                    <div className="impact-count">{analysis.amenitiesAnalysis.bodegasImpact.withBodegas.count} prop.</div>
+                                                    <div className="impact-price">
+                                                        {formatUF(analysis.amenitiesAnalysis.bodegasImpact.withBodegas.avgPriceUF)}
+                                                    </div>
+                                                    <div className="impact-detail">
+                                                        Promedio: {analysis.amenitiesAnalysis.bodegasImpact.withBodegas.avgBodegas.toFixed(1)} bodegas
+                                                    </div>
+                                                </div>
+                                                <div className="impact-divider">vs</div>
+                                                <div className="impact-side">
+                                                    <div className="impact-label">sin bodega</div>
+                                                    <div className="impact-count">{analysis.amenitiesAnalysis.bodegasImpact.withoutBodegas.count} prop.</div>
+                                                    <div className="impact-price">
+                                                        {formatUF(analysis.amenitiesAnalysis.bodegasImpact.withoutBodegas.avgPriceUF)}
+                                                    </div>
+                                                    <div className="impact-detail">
+                                                        Diferencia: {formatUF(
+                                                            analysis.amenitiesAnalysis.bodegasImpact.withBodegas.avgPriceUF - 
+                                                            analysis.amenitiesAnalysis.bodegasImpact.withoutBodegas.avgPriceUF
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {analysis.amenitiesAnalysis.features && Object.keys(analysis.amenitiesAnalysis.features).length > 0 && (
+                                    <div className="features-analysis">
+                                        <h3>Comodidades Detectadas</h3>
+                                        <div className="features-grid">
+                                            {Object.entries(analysis.amenitiesAnalysis.features).map(([feature, data]) => (
+                                                <div key={feature} className="feature-card">
+                                                    <div className="feature-icon">
+                                                        {feature === 'gimnasio' && '🏋️'}
+                                                        {feature === 'piscina' && '🏊'}
+                                                        {feature === 'terraza' && '🌇'}
+                                                        {feature === 'seguridad' && '🔒'}
+                                                        {feature === 'amoblado' && '🛋️'}
+                                                        {feature === 'logia' && '🪟'}
+                                                        {feature === 'vista' && '🌄'}
+                                                        {feature === 'luminoso' && '☀️'}
+                                                    </div>
+                                                    <div className="feature-name">{feature}</div>
+                                                    <div className="feature-stats">
+                                                        <div className="feature-count">{data.count} propiedades</div>
+                                                        <div className="feature-percentage">{data.percentage}% del total</div>
+                                                        {data.avgPriceUF && (
+                                                            <div className="feature-price">
+                                                                Promedio: {formatUF(data.avgPriceUF)}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {analysis.amenitiesAnalysis.valuableCombinations && analysis.amenitiesAnalysis.valuableCombinations.length > 0 && (
+                                    <div className="combinations-analysis">
+                                        <h3>Configuraciones Más Comunes</h3>
+                                        <div className="combinations-grid">
+                                            {analysis.amenitiesAnalysis.valuableCombinations.slice(0, 6).map((combo, index) => (
+                                                <div key={index} className="combo-card">
+                                                    <div className="combo-name">{combo.combo}</div>
+                                                    <div className="combo-stats">
+                                                        <div className="combo-stat">
+                                                            <span>Cantidad:</span>
+                                                            <strong>{combo.count} prop.</strong>
+                                                        </div>
+                                                        <div className="combo-stat">
+                                                            <span>Precio Promedio:</span>
+                                                            <strong>{formatUF(combo.avgPriceUF)}</strong>
+                                                        </div>
+                                                        <div className="combo-stat">
+                                                            <span>Superficie Promedio:</span>
+                                                            <strong>{Math.round(combo.avgArea)}m²</strong>
+                                                        </div>
+                                                        <div className="combo-stat highlight">
+                                                            <span>Precio/m²:</span>
+                                                            <strong>{combo.avgPricePerSqMeterUF.toFixed(1)} UF/m²</strong>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* opportunities */}
+                        {analysis.opportunities && analysis.opportunities.length > 0 && (
+                            <div className="analysis-section">
+                                <h2>Oportunidades de Inversión</h2>
+                                <p className="section-description">
+                                    Propiedades con precios significativamente por debajo del promedio del mercado
+                                </p>
+                                <div className="opportunities-grid">
+                                    {analysis.opportunities.slice(0, 6).map((opp, index) => (
+                                        <div key={index} className="opportunity-card">
+                                            <div className="opportunity-header">
+                                                <span className="opportunity-rank">TOP {index + 1}</span>
+                                                <span className={`opportunity-badge ${opp.score > 1 ? 'excellent' : 'good'}`}>
+                                                    {opp.recommendation}
+                                                </span>
+                                            </div>
+                                            <h4>{opp.property.title}</h4>
+                                            
+                                            {/* Basic specs grid */}
+                                            <div className="opportunity-specs">
+                                                <div className="spec-item">
+                                                    <span className="spec-icon">🛏️</span>
+                                                    <span className="spec-value">{opp.property.bedrooms || 0}</span>
+                                                    <span className="spec-label">dorm.</span>
+                                                </div>
+                                                <div className="spec-item">
+                                                    <span className="spec-icon">🚿</span>
+                                                    <span className="spec-value">{opp.property.bathrooms || 0}</span>
+                                                    <span className="spec-label">baños</span>
+                                                </div>
+                                                <div className="spec-item">
+                                                    <span className="spec-icon">🚗</span>
+                                                    <span className="spec-value">{opp.property.parking || opp.property.parkings || 0}</span>
+                                                    <span className="spec-label">estac.</span>
+                                                </div>
+                                                <div className="spec-item">
+                                                    <span className="spec-icon">📦</span>
+                                                    <span className="spec-value">{opp.property.bodegas || 0}</span>
+                                                    <span className="spec-label">bodega{(opp.property.bodegas || 0) !== 1 ? 's' : ''}</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Amenities */}
+                                            {opp.property.amenities && Object.values(opp.property.amenities).some(v => v) && (
+                                                <div className="opportunity-amenities">
+                                                    <strong>Amenidades:</strong>
+                                                    <div className="amenity-tags">
+                                                        {opp.property.amenities.gimnasio && <span className="amenity-tag">🏋️ Gimnasio</span>}
+                                                        {opp.property.amenities.piscina && <span className="amenity-tag">🏊 Piscina</span>}
+                                                        {opp.property.amenities.terraza && <span className="amenity-tag">🌇 Terraza</span>}
+                                                        {opp.property.amenities.seguridad && <span className="amenity-tag">🔒 Seguridad</span>}
+                                                        {opp.property.amenities.ascensor && <span className="amenity-tag">🛗 Ascensor</span>}
+                                                        {opp.property.amenities.amoblado && <span className="amenity-tag">🛋️ Amoblado</span>}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Additional info */}
+                                            <div className="opportunity-additional">
+                                                {opp.property.yearBuilt && (
+                                                    <div className="additional-item">
+                                                        <span>🏗️ Año:</span>
+                                                        <strong>{opp.property.yearBuilt}</strong>
+                                                    </div>
+                                                )}
+                                                {opp.property.orientation && (
+                                                    <div className="additional-item">
+                                                        <span>🧭 Orientación:</span>
+                                                        <strong>{opp.property.orientation}</strong>
+                                                    </div>
+                                                )}
+                                                {!opp.property.yearBuilt && !opp.property.orientation && (
+                                                    <div className="additional-item">
+                                                        <span>ℹ️ Info adicional:</span>
+                                                        <strong>No disponible</strong>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <div className="opportunity-details">
+                                                <div className="detail-row">
+                                                    <span>Precio:</span>
+                                                    <strong>{formatUF(opp.property.price)}</strong>
+                                                </div>
+                                                <div className="detail-row">
+                                                    <span>Superficie:</span>
+                                                    <strong>{opp.property.area}m²</strong>
+                                                </div>
+                                                <div className="detail-row highlight">
+                                                    <span>Precio/m²:</span>
+                                                    <strong>{opp.pricePerSqM.toFixed(1)} UF/m²</strong>
+                                                </div>
+                                                <div className="detail-row">
+                                                    <span>Promedio Mercado:</span>
+                                                    <strong>{opp.marketAverage.toFixed(1)} UF/m²</strong>
+                                                </div>
+                                                <div className="detail-row success">
+                                                    <span>Ahorro Potencial:</span>
+                                                    <strong>{opp.savings.toFixed(1)} UF/m²</strong>
+                                                </div>
+                                            </div>
+                                            
+                                            {/* Link to Portal Inmobiliario */}
+                                            {opp.property.link && (
+                                                <a 
+                                                    href={opp.property.link} 
+                                                    target="_blank" 
+                                                    rel="noopener noreferrer"
+                                                    className="opportunity-link"
+                                                >
+                                                    Ver en Portal Inmobiliario →
+                                                </a>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </>
+                )}
             </div>
         </div>
     )
 }
 
 export default Dashboard
-

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import './App.css'
 import Navbar from './components/Navbar'
 import Home from './pages/Home'
@@ -9,7 +9,15 @@ import RawData from './pages/RawData'
 import Analysis from './pages/Analysis'
 
 function App() {
-  const [currentPage, setCurrentPage] = useState('home')
+  // Get initial page from localStorage, default to 'home' if not found
+  const [currentPage, setCurrentPage] = useState(() => {
+    return localStorage.getItem('currentPage') || 'home'
+  })
+
+  // Save current page to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('currentPage', currentPage)
+  }, [currentPage])
 
   const renderPage = () => {
     switch (currentPage) {

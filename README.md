@@ -1,59 +1,47 @@
-# React + Vite - Web Scraper Inmobiliario
+# real estate market intelligence platform
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+web scraping and analysis system for chilean real estate market. extracts data from portal inmobiliario and provides advanced analytics with ai preparation.
 
-## 🏠 Acerca del Proyecto
+## features
 
-Sistema de web scraping y análisis de propiedades inmobiliarias del mercado chileno. Extrae datos de Portal Inmobiliario y proporciona análisis avanzados con preparación para integración con IA.
+- web scraping: automated property data extraction
+- raw data: unprocessed data visualization
+- ai analysis: system prepared for machine learning
+- market insights: advanced statistical analysis
+- investment opportunities: automatic detection of best deals
+- geographic analysis: comparison by location
+- price analysis: distribution, trends, and correlations
 
-### Características Principales
-
-- 🕷️ **Web Scraping**: Extracción automatizada de propiedades
-- 📊 **Raw Data**: Visualización de datos sin procesar
-- 🤖 **Análisis con IA**: Sistema preparado para Machine Learning
-- 📈 **Insights del Mercado**: Análisis estadísticos avanzados
-- 🎯 **Oportunidades de Inversión**: Detección automática de mejores ofertas
-- 📍 **Análisis Geográfico**: Comparación por comunas
-- 💰 **Análisis de Precios**: Distribución, tendencias y correlaciones
-
-## 🚀 Cómo usar
-
-### Instalación
+## installation
 
 ```bash
 yarn install
 ```
 
-### Desarrollo
+## usage
 
-Para iniciar solo el frontend:
-
-```bash
-yarn dev
-```
-
-Para iniciar frontend + backend juntos:
+start both frontend and backend:
 
 ```bash
 yarn dev:full
 ```
 
-O en terminales separadas:
+or separately:
 
 ```bash
-# Terminal 1 - Frontend
+# terminal 1 - frontend
 yarn dev
 
-# Terminal 2 - Backend
+# terminal 2 - backend
 yarn server
 ```
 
-### Acceso a la Aplicación
+## access
 
-- **Frontend**: http://localhost:5173
-- **Backend API**: http://localhost:3001
+- frontend: http://localhost:5173
+- backend api: http://localhost:3001
 
-## 📁 Estructura del Proyecto
+## project structure
 
 ```
 iic3113/
@@ -61,158 +49,111 @@ iic3113/
 │   ├── components/
 │   │   └── Navbar.jsx
 │   ├── pages/
-│   │   ├── Home.jsx          # Página de inicio
-│   │   ├── Dashboard.jsx     # Dashboard principal
-│   │   ├── RawData.jsx       # Visualización de datos crudos
-│   │   ├── Analysis.jsx      # Análisis avanzado con IA
-│   │   ├── Guide.jsx         # Guía de uso
-│   │   └── Team.jsx          # Información del equipo
+│   │   ├── Home.jsx
+│   │   ├── Dashboard.jsx (with pagination)
+│   │   ├── RawData.jsx
+│   │   ├── Analysis.jsx
+│   │   ├── Guide.jsx
+│   │   └── Team.jsx
 │   └── App.jsx
 ├── server/
-│   ├── index.js              # Servidor Express
-│   ├── scraper.js            # Web scraper con Puppeteer
-│   ├── dataAnalyzer.js       # Motor de análisis
-│   └── README.md             # Documentación del backend
+│   ├── index.js (express server)
+│   ├── scraper.js (puppeteer-core with local chrome)
+│   └── dataAnalyzer.js
 └── package.json
 ```
 
-## 🛠️ Tecnologías
+## technologies
 
-### Frontend
-- React 19
-- Vite
-- CSS Modules
-- Axios (para llamadas API)
+### frontend
+- react 19
+- vite
+- css modules
+- axios
 
-### Backend
-- Express.js
-- Puppeteer (web scraping)
-- Cheerio (HTML parsing)
-- CORS
+### backend
+- express.js
+- puppeteer-core (uses local chrome)
+- cheerio (html parsing)
+- cors
 
-## 📊 Páginas de la Aplicación
+## pages
 
-### 1. Home
-Página de bienvenida con información del proyecto y estadísticas generales.
+### dashboard
+main interface with:
+- search filters (operation, type, location, price)
+- property cards with pagination (20 per page)
+- general statistics
+- market insights
 
-### 2. Dashboard
-Interfaz principal con:
-- Filtros de búsqueda (operación, tipo, comuna, precio)
-- Tarjetas de propiedades
-- Estadísticas generales
-- Insights del mercado
+### ai analysis
+advanced analysis with:
+- statistical summary
+- market insights
+- price per m² analysis
+- location rankings
+- investment opportunities
+- suggested ml models
 
-### 3. Análisis IA
-Análisis avanzado con:
-- Resumen estadístico
-- Insights del mercado
-- Análisis de precios por m²
-- Rankings por ubicación
-- Oportunidades de inversión
-- Modelos de ML sugeridos
-- Estado de preparación para IA
+### raw data
+unprocessed data visualization with:
+- scraping metadata
+- three views: formatted, json, table
+- json/csv export
 
-### 4. Raw Data
-Visualización de datos sin procesar con:
-- Metadata del scraping
-- Tres vistas: Formateado, JSON, Tabla
-- Exportación a JSON/CSV
-- Detalles completos de cada propiedad
+## api endpoints
 
-### 5. Guía
-Guía completa de uso de la plataforma.
+- `GET /api/health` - health check
+- `GET /api/properties` - get properties
+- `GET /api/raw-data` - raw unprocessed data
+- `GET /api/analysis` - advanced analysis
+- `POST /api/scrape` - trigger scraping
+- `POST /api/ai-analysis` - ai analysis (coming soon)
 
-### 6. Equipo
-Información del equipo de desarrollo.
+## team
 
-## 🤖 Integración con IA (Preparada)
+- rodolfo andrés armas saenz - project lead
+- juan manuel hernández - business analysis
+- agustín arias - database lead
+- baltazar lutjens - nlp lead
+- nicolás fernández - data lead
+- maría ignacia de goyeneche - web scraping lead
 
-El sistema está completamente preparado para integración con IA, incluyendo:
+## notes
 
-### Data Schema para Machine Learning
-- **Campos numéricos**: price, priceUF, bedrooms, bathrooms, area, parking
-- **Campos categóricos**: comuna, propertyType, operation, currency, realEstate
-- **Campos temporales**: scrapedAt
+### web scraper
+uses puppeteer-core with local chrome installation for headless browsing and cheerio for html parsing. includes:
+- user-agent rotation
+- random delays between requests
+- robust error handling
+- multi-page support (up to 50 pages)
 
-### Modelos Sugeridos
-1. **Price Prediction** (Regresión)
-   - Predice precios basado en características
-   
-2. **Property Classification** (Clasificación)
-   - Clasifica tipos de propiedades
-   
-3. **Opportunity Detection** (Detección de Anomalías)
-   - Identifica oportunidades de inversión
-   
-4. **Market Segmentation** (Clustering)
-   - Segmenta el mercado en grupos similares
+### data analysis
+analysis engine automatically calculates:
+- descriptive statistics
+- price distributions
+- location rankings
+- variable correlations
+- investment opportunities
+- data quality metrics
+- outlier detection
 
-### Endpoints Preparados
-- `POST /api/ai-analysis` - Para análisis con modelos de IA (próximamente)
+## ai integration (prepared)
 
-## 📡 API Endpoints
+system is fully prepared for ai integration:
 
-Ver documentación completa en `server/README.md`
+### ml data schema
+- numeric fields: price, priceUF, bedrooms, bathrooms, area, parking
+- categorical fields: comuna, propertyType, operation, currency, realEstate
+- temporal fields: scrapedAt
 
-Principales endpoints:
-- `GET /api/health` - Health check
-- `GET /api/properties` - Obtener propiedades
-- `GET /api/raw-data` - Datos sin procesar
-- `GET /api/analysis` - Análisis avanzado
-- `POST /api/scrape` - Ejecutar scraping
-- `POST /api/ai-analysis` - Análisis con IA (próximamente)
+### suggested models
+1. price prediction (regression)
+2. property classification
+3. opportunity detection (anomaly detection)
+4. market segmentation (clustering)
 
-## 👥 Equipo
+## license
 
-- **Rodolfo Andrés Armas Saenz** - Gerente / Líder de Proyecto
-- **Juan Manuel Hernández** - Gerente / Análisis de Negocio
-- **Agustín Arias** - Jefe de Bases de Datos
-- **Baltazar Lutjens** - Jefe de NLP
-- **Nicolás Fernández** - Jefe de Datos
-- **María Ignacia De Goyeneche** - Jefa de Web Scraping
+this project is part of iic3113 course.
 
-## 📝 Notas de Desarrollo
-
-### Web Scraping
-El scraper utiliza Puppeteer para navegación headless y Cheerio para parsing HTML. Incluye:
-- Rotación de User-Agent
-- Delays aleatorios entre requests
-- Manejo de errores robusto
-- Soporte para múltiples páginas
-
-### Análisis de Datos
-El motor de análisis calcula automáticamente:
-- Estadísticas descriptivas
-- Distribuciones de precios
-- Rankings por ubicación
-- Correlaciones entre variables
-- Oportunidades de inversión
-- Calidad de datos
-- Valores atípicos (outliers)
-
-## 🔜 Próximas Características
-
-- [ ] Integración con base de datos
-- [ ] Modelos de ML entrenados
-- [ ] API de predicción de precios
-- [ ] Sistema de alertas
-- [ ] Exportación avanzada de reportes
-- [ ] Dashboard de administración
-- [ ] Autenticación de usuarios
-- [ ] Historial de búsquedas
-
-## 📄 Licencia
-
-Este proyecto es parte del curso IIC3113.
-
----
-
-## React Compiler
-
-The React Compiler is enabled on this template. See [this documentation](https://react.dev/learn/react-compiler) for more information.
-
-Note: This will impact Vite dev & build performances.
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
