@@ -1,7 +1,11 @@
 import express from 'express';
 import cors from 'cors';
+import dotenv from 'dotenv';
+import OpenAI from 'openai';
 import { scrapePortalInmobiliario } from './scraper.js';
 import { analyzeData } from './dataAnalyzer.js';
+
+dotenv.config();
 
 const app = express();
 const PORT = 3001;
@@ -196,6 +200,92 @@ app.post('/api/ai-analysis', async (req, res) => {
         });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+const client = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY
+});
+
+app.post("/api/chat-analysis", async (req, res) => {
+    try {
+        const { message } = req.body;
+
+        if (!message) {
+            return res.status(400).json({ error: "Falta mensaje" });
+        }
+
+        // Si no hay scraping
+        if (!scrapedData.properties || scrapedData.properties.length === 0) {
+            return res.json({
+                reply: "Aún no hay datos disponibles. Debes realizar un scraping antes."
+            });
+        }
+
+        const properties = scrapedData.properties;
+
+        // === Estadísticas generales
+        const total = properties.length;
+        const avgPrice = Math.round(properties.reduce((a, b) => a + (b.priceUF || 0), 0) / total);
+        const avgMeters = Math.round(properties.reduce((a, b) => a + (b.sqMeters || 0), 0) / total);
+
+        const byComuna = {};
+        for (const p of properties) {
+            const c = p.comuna || "desconocida";
+            if (!byComuna[c]) byComuna[c] = { count: 0, totalUF: 0 };
+            byComuna[c].count++;
+            byComuna[c].totalUF += p.priceUF || 0;
+        }
+
+        for (const c in byComuna) {
+            byComuna[c].avgPrice = Math.round(byComuna[c].totalUF / byComuna[c].count);
+        }
+
+        // === TODAS LAS PROPIEDADES (compactas)
+        const compactProperties = properties.map(p => ({
+            id: p.id,
+            title: p.title,
+            priceUF: p.priceUF,
+            sqMeters: p.sqMeters,
+            comuna: p.comuna,
+            link: p.link
+        }));
+
+        const context = {
+            totalProperties: total,
+            averageUF: avgPrice,
+            averageSqMeters: avgMeters,
+            comunas: byComuna,
+            properties: compactProperties
+        };
+
+        // === LLM CALL ===
+        const completion = await client.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [
+                {
+                    role: "system",
+                    content:
+                        "Eres un analista inmobiliario experto. Responde basándote EXCLUSIVAMENTE en los datos que te entrego (listado completo de propiedades). Siempre que recomiendes una propiedad, incluye su link."
+                },
+                {
+                    role: "assistant",
+                    content: "Datos del scraping:\n" + JSON.stringify(context, null, 2)
+                },
+                {
+                    role: "user",
+                    content: message
+                }
+            ]
+        });
+
+        const reply = completion.choices[0].message.content;
+
+        res.json({ reply });
+
+    } catch (error) {
+        console.error("Error en /api/chat-analysis:", error);
+        res.status(500).json({ error: error.message });
     }
 });
 
