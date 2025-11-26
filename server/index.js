@@ -227,7 +227,7 @@ app.post("/api/chat-analysis", async (req, res) => {
         // === Estadísticas generales
         const total = properties.length;
         const avgPrice = Math.round(properties.reduce((a, b) => a + (b.priceUF || 0), 0) / total);
-        const avgMeters = Math.round(properties.reduce((a, b) => a + (b.sqMeters || 0), 0) / total);
+        const avgMeters = Math.round(properties.reduce((a, b) => a + (b.area || 0), 0) / total);
 
         const byComuna = {};
         for (const p of properties) {
@@ -246,7 +246,11 @@ app.post("/api/chat-analysis", async (req, res) => {
             id: p.id,
             title: p.title,
             priceUF: p.priceUF,
-            sqMeters: p.sqMeters,
+            area: p.area,
+            bedrooms: p.bedrooms,
+            bathrooms: p.bathrooms,
+            parking: p.parking,
+            bodegas: p.bodegas,
             comuna: p.comuna,
             link: p.link
         }));

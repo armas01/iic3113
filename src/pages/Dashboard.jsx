@@ -168,10 +168,42 @@ function Dashboard() {
                 setScrapeMessage('✗ Error al eliminar datos')
             }
         } catch (error) {
-            setScrapeMessage('✗ Error de conexión con el servidor')
+            setScrapeMessage('✗ Error de conexión')
             console.error('clear error:', error)
         } finally {
             setLoading(false)
+        }
+    }
+
+    const addToFavorites = (property) => {
+        const favorites = JSON.parse(localStorage.getItem('favoriteProperties') || '[]')
+        
+        const exists = favorites.find(fav => fav.id === property.id)
+        if (!exists) {
+            // Track this as a recommendation
+            trackPropertyInteraction(property.id, 'recommendation')
+            
+            favorites.push(property)
+            localStorage.setItem('favoriteProperties', JSON.stringify(favorites))
+            setScrapeMessage('✅ Propiedad agregada a favoritos')
+            setTimeout(() => setScrapeMessage(''), 3000)
+        } else {
+            setScrapeMessage('⚠️ Esta propiedad ya está en favoritos')
+            setTimeout(() => setScrapeMessage(''), 3000)
+        }
+    }
+
+    const trackPropertyInteraction = async (propertyId, action) => {
+        try {
+            await fetch('http://localhost:3001/api/track-interaction', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ propertyId, action })
+            })
+        } catch (error) {
+            console.error('Error tracking interaction:', error)
         }
     }
 
@@ -687,6 +719,13 @@ function Dashboard() {
                                 <div className="opportunities-grid">
                                     {analysis.opportunities.slice(0, 6).map((opp, index) => (
                                         <div key={index} className="opportunity-card">
+                                            <button 
+                                                className="add-to-favorites-btn"
+                                                onClick={() => addToFavorites(opp.property)}
+                                                title="Agregar a favoritos"
+                                            >
+                                                ❤️
+                                            </button>
                                             <div className="opportunity-header">
                                                 <span className="opportunity-rank">TOP {index + 1}</span>
                                                 <span className={`opportunity-badge ${opp.score > 1 ? 'excellent' : 'good'}`}>
