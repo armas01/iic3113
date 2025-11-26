@@ -27,6 +27,22 @@ function Navbar({ currentPage, setCurrentPage }) {
                     </li>
                     <li>
                         <button
+                            className={currentPage === 'favorites' ? 'active' : ''}
+                            onClick={() => setCurrentPage('favorites')}
+                        >
+                            ❤️ Favoritos
+                        </button>
+                    </li>
+                    <li>
+                        <button
+                            className={currentPage === 'featured' ? 'active' : ''}
+                            onClick={() => setCurrentPage('featured')}
+                        >
+                            ⭐ Destacadas
+                        </button>
+                    </li>
+                    <li>
+                        <button
                             className={currentPage === 'analysis' ? 'active' : ''}
                             onClick={() => setCurrentPage('analysis')}
                         >
@@ -35,10 +51,10 @@ function Navbar({ currentPage, setCurrentPage }) {
                     </li>
                     <li>
                         <button
-                            className={currentPage === 'rawdata' ? 'active' : ''}
-                            onClick={() => setCurrentPage('rawdata')}
+                            className={currentPage === 'allproperties' ? 'active' : ''}
+                            onClick={() => setCurrentPage('allproperties')}
                         >
-                            Raw Data
+                            🏘️ Propiedades
                         </button>
                     </li>
                     <li>
