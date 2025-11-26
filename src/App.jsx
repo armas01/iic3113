@@ -5,8 +5,10 @@ import Home from './pages/Home'
 import Guide from './pages/Guide'
 import Team from './pages/Team'
 import Dashboard from './pages/Dashboard'
-import RawData from './pages/RawData'
+import AllProperties from './pages/AllProperties'
 import Analysis from './pages/Analysis'
+import Favorites from './pages/Favorites'
+import Featured from './pages/Featured'
 
 function App() {
   // Get initial page from localStorage, default to 'home' if not found
@@ -29,10 +31,14 @@ function App() {
         return <Team />
       case 'dashboard':
         return <Dashboard />
-      case 'rawdata':
-        return <RawData />
+      case 'allproperties':
+        return <AllProperties />
       case 'analysis':
         return <Analysis />
+      case 'favorites':
+        return <Favorites />
+      case 'featured':
+        return <Featured />
       default:
         return <Home />
     }

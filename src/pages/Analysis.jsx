@@ -7,10 +7,11 @@ function Analysis() {
     const [messages, setMessages] = useState([
         {
             from: "bot",
-            text: "Bienvenido al asistente de análisis inmobiliario con IA. Hemos recopilado datos reales desde Portal Inmobiliario mediante nuestro scraper. ¿Qué te gustaría analizar?"
+            text: "¡Hola! 👋 Soy tu asistente de análisis inmobiliario. He recopilado datos reales desde Portal Inmobiliario. ¿Qué te gustaría saber? \n\nPuedes preguntarme sobre:\n• 💰 Propiedades más económicas\n• 📏 Propiedades más espaciosas\n• 🏘️ Análisis por sectores\n• ⭐ Recomendaciones personalizadas\n• 📊 Tendencias del mercado"
         }
     ]);
     const [isReady, setIsReady] = useState(false);
+    const [isTyping, setIsTyping] = useState(false);
 
     useEffect(() => {
         async function checkData() {
@@ -23,7 +24,7 @@ function Analysis() {
                     setMessages([
                         {
                             from: "bot",
-                            text: "Bienvenido al asistente de análisis inmobiliario con IA. Hemos recopilado datos reales desde Portal Inmobiliario mediante nuestro scraper. ¿Qué te gustaría analizar?"
+                            text: "¡Hola! 👋 Soy tu asistente de análisis inmobiliario. He recopilado datos reales desde Portal Inmobiliario. ¿Qué te gustaría saber? \n\nPuedes preguntarme sobre:\n• 💰 Propiedades más económicas\n• 📏 Propiedades más espaciosas\n• 🏘️ Análisis por sectores\n• ⭐ Recomendaciones personalizadas\n• 📊 Tendencias del mercado"
                         }
                     ]);
                 } else {
@@ -31,7 +32,7 @@ function Analysis() {
                     setMessages([
                         {
                             from: "bot",
-                            text: "Aún no se han recopilado datos. Debes realizar un scraping antes de utilizar el análisis con IA."
+                            text: "⚠️ Aún no se han recopilado datos. \n\nPor favor, ve al Dashboard y realiza un scraping antes de utilizar el análisis con IA."
                         }
                     ]);
                 }
@@ -45,26 +46,37 @@ function Analysis() {
 
 
     const sendMessage = async () => {
+        if (!input.trim()) return;
+
         const newMessages = [...messages, { from: "me", text: input }];
         setMessages(newMessages);
-
         setInput("");
+        setIsTyping(true);
 
-        const res = await fetch("http://localhost:3001/api/chat-analysis", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ message: input }),
-        });
+        try {
+            const res = await fetch("http://localhost:3001/api/chat-analysis", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ message: input }),
+            });
 
-        const data = await res.json();
+            const data = await res.json();
 
-        setMessages([...newMessages, { from: "bot", text: data.reply }]);
-        setInput("");
+            setMessages([...newMessages, { from: "bot", text: data.reply }]);
+        } catch (error) {
+            setMessages([...newMessages, { 
+                from: "bot", 
+                text: "❌ Error al conectar con el servidor. Por favor, verifica que el backend esté activo." 
+            }]);
+        } finally {
+            setIsTyping(false);
+        }
     };
 
     return (
         <div className="analysis-chat">
             <h2>Asistente Inteligente</h2>
+            <p className="chat-subtitle">Análisis personalizado basado en datos reales</p>
 
             <div className="chat-window">
                 {messages.map((m, i) => (
@@ -72,6 +84,13 @@ function Analysis() {
                         {m.text}
                     </div>
                 ))}
+                {isTyping && (
+                    <div className="typing-indicator">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                )}
             </div>
 
             <div className="chat-input">
@@ -79,15 +98,21 @@ function Analysis() {
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={(e) => {
-                        if (e.key === "Enter" && isReady) {
+                        if (e.key === "Enter" && isReady && !isTyping) {
                             e.preventDefault();
                             sendMessage();
                         }
                     }}
-                    placeholder={isReady ? "Escribe tu mensaje..." : "Debes hacer scraping primero"}
-                    disabled={!isReady}
+                    placeholder={isReady ? "Escribe tu pregunta..." : "Debes hacer scraping primero"}
+                    disabled={!isReady || isTyping}
                 />
-                <button className="send-btn" onClick={sendMessage} disabled={!isReady}>➤</button>
+                <button 
+                    className="send-btn" 
+                    onClick={sendMessage} 
+                    disabled={!isReady || isTyping || !input.trim()}
+                >
+                    ➤
+                </button>
             </div>
         </div>
     );

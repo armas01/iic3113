@@ -28,6 +28,11 @@ let scrapeProgress = {
     completed: false
 };
 
+// Tracking system for featured properties
+let propertyInteractions = {
+    // propertyId: { views: 0, recommendations: 0, lastUpdate: timestamp }
+};
+
 app.get('/api/properties', (req, res) => {
     try {
         res.json({
@@ -227,7 +232,7 @@ app.post("/api/chat-analysis", async (req, res) => {
         // === Estadísticas generales
         const total = properties.length;
         const avgPrice = Math.round(properties.reduce((a, b) => a + (b.priceUF || 0), 0) / total);
-        const avgMeters = Math.round(properties.reduce((a, b) => a + (b.sqMeters || 0), 0) / total);
+        const avgMeters = Math.round(properties.reduce((a, b) => a + (b.area || 0), 0) / total);
 
         const byComuna = {};
         for (const p of properties) {
@@ -246,7 +251,11 @@ app.post("/api/chat-analysis", async (req, res) => {
             id: p.id,
             title: p.title,
             priceUF: p.priceUF,
-            sqMeters: p.sqMeters,
+            area: p.area,
+            bedrooms: p.bedrooms,
+            bathrooms: p.bathrooms,
+            parking: p.parking,
+            bodegas: p.bodegas,
             comuna: p.comuna,
             link: p.link
         }));
@@ -286,6 +295,105 @@ app.post("/api/chat-analysis", async (req, res) => {
     } catch (error) {
         console.error("Error en /api/chat-analysis:", error);
         res.status(500).json({ error: error.message });
+    }
+});
+
+// Track property interactions
+app.post('/api/track-interaction', (req, res) => {
+    try {
+        const { propertyId, action } = req.body;
+        
+        if (!propertyId || !action) {
+            return res.status(400).json({ success: false, error: 'Missing required fields' });
+        }
+
+        if (!propertyInteractions[propertyId]) {
+            propertyInteractions[propertyId] = {
+                views: 0,
+                recommendations: 0,
+                lastUpdate: new Date().toISOString()
+            };
+        }
+
+        if (action === 'view') {
+            propertyInteractions[propertyId].views++;
+        } else if (action === 'recommendation') {
+            propertyInteractions[propertyId].recommendations++;
+        }
+
+        propertyInteractions[propertyId].lastUpdate = new Date().toISOString();
+
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Get featured properties (based on automatic criteria from scraped data)
+app.get('/api/featured', (req, res) => {
+    try {
+        if (!scrapedData.properties || scrapedData.properties.length === 0) {
+            return res.json({
+                success: true,
+                categories: {
+                    bestValue: [],
+                    mostSpacious: [],
+                    bestAmenities: []
+                },
+                lastUpdate: new Date().toISOString()
+            });
+        }
+
+        const properties = scrapedData.properties.filter(p => p.priceUF > 0 && p.area > 0);
+
+        // 1. BEST VALUE: Lowest price per square meter
+        const bestValue = properties
+            .map(p => ({
+                ...p,
+                pricePerSqM: p.priceUF / p.area,
+                popularityScore: 100 // For UI consistency
+            }))
+            .sort((a, b) => a.pricePerSqM - b.pricePerSqM)
+            .slice(0, 10);
+
+        // 2. MOST SPACIOUS: Largest properties relative to price
+        const mostSpacious = properties
+            .map(p => ({
+                ...p,
+                spaceScore: p.area / (p.priceUF / 1000), // m² per 1000 UF
+                popularityScore: Math.min((p.area / 200) * 100, 100) // Normalize to 100
+            }))
+            .sort((a, b) => b.spaceScore - a.spaceScore)
+            .slice(0, 10);
+
+        // 3. BEST AMENITIES: Most complete properties
+        const bestAmenities = properties
+            .map(p => {
+                const amenitiesCount = Object.values(p.amenities || {}).filter(v => v).length;
+                const specs = (p.bedrooms || 0) + (p.bathrooms || 0) + (p.parking || 0) + (p.bodegas || 0);
+                const amenitiesScore = amenitiesCount * 10 + specs * 5;
+                
+                return {
+                    ...p,
+                    amenitiesCount,
+                    amenitiesScore,
+                    popularityScore: Math.min(amenitiesScore * 2, 100)
+                };
+            })
+            .sort((a, b) => b.amenitiesScore - a.amenitiesScore)
+            .slice(0, 10);
+
+        res.json({
+            success: true,
+            categories: {
+                bestValue,
+                mostSpacious,
+                bestAmenities
+            },
+            lastUpdate: new Date().toISOString()
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
     }
 });
 
