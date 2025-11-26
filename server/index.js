@@ -275,7 +275,16 @@ app.post("/api/chat-analysis", async (req, res) => {
                 {
                     role: "system",
                     content:
-                        "Eres un analista inmobiliario experto. Responde basándote EXCLUSIVAMENTE en los datos que te entrego (listado completo de propiedades). Siempre que recomiendes una propiedad, incluye su link."
+                        `Eres un analista inmobiliario experto. Responde basándote EXCLUSIVAMENTE en los datos que te entrego (listado completo de propiedades).
+                        
+                        IMPORTANTE: Cuando recomiendes o menciones propiedades específicas, SIEMPRE incluye al final de tu respuesta la lista de IDs de las propiedades mencionadas en este formato exacto:
+                        
+                        [PROPERTIES: id1, id2, id3]
+                        
+                        Ejemplo: Si recomiendas 3 propiedades, termina tu respuesta con:
+                        [PROPERTIES: property-123, property-456, property-789]
+                        
+                        Esto ayudará a mostrar las propiedades de forma visual al usuario.`
                 },
                 {
                     role: "assistant",
@@ -288,9 +297,23 @@ app.post("/api/chat-analysis", async (req, res) => {
             ]
         });
 
-        const reply = completion.choices[0].message.content;
+        let reply = completion.choices[0].message.content;
+        let propertiesToShow = [];
 
-        res.json({ reply });
+        // Extract property IDs if present
+        const propertiesMatch = reply.match(/\[PROPERTIES:\s*([^\]]+)\]/);
+        if (propertiesMatch) {
+            const propertyIds = propertiesMatch[1].split(',').map(id => id.trim());
+            propertiesToShow = properties.filter(p => propertyIds.includes(p.id));
+            
+            // Remove the [PROPERTIES: ...] tag from the reply
+            reply = reply.replace(/\[PROPERTIES:\s*[^\]]+\]/, '').trim();
+        }
+
+        res.json({ 
+            reply,
+            properties: propertiesToShow
+        });
 
     } catch (error) {
         console.error("Error en /api/chat-analysis:", error);
